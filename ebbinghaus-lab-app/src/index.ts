@@ -29,6 +29,12 @@ type User = {
 
 const app = new Hono<{ Bindings: Bindings, Variables: { userId: string } }>();
 
+// Global Error Handler to guarantee JSON error response
+app.onError((err, c) => {
+  console.error('Unhandled error:', err);
+  return c.json({ error: err.message || 'Internal Server Error' }, 500);
+});
+
 // Helper: Format Date to YYYY-MM-DD
 function formatDate(d: Date): string {
   const year = d.getFullYear();
@@ -67,17 +73,24 @@ function getJwtSecret(c: any) {
   return c.env.JWT_SECRET || 'fallback-secret-key-for-lab';
 }
 
+function checkDbBinding(c: any) {
+  if (!c.env || !c.env.DB) {
+    throw new Error('Database (DB) is not bound in Cloudflare Settings. Please check D1 Database Bindings in Settings -> Functions.');
+  }
+}
+
 // ================= AUTH ROUTES =================
 
 app.post('/api/auth/register', async (c) => {
+  checkDbBinding(c);
   const body = await c.req.json();
   if (!body.username || !body.password) {
-    return c.json({ error: 'Username and password are required' }, 400);
+    return c.json({ error: 'ユーザー名とパスワードを入力してください' }, 400);
   }
 
   const existing = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(body.username).first();
   if (existing) {
-    return c.json({ error: 'Username already taken' }, 400);
+    return c.json({ error: 'このユーザー名は既に使用されています' }, 400);
   }
 
   const id = crypto.randomUUID();
@@ -86,14 +99,15 @@ app.post('/api/auth/register', async (c) => {
   await c.env.DB.prepare('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)')
     .bind(id, body.username, passHash).run();
 
-  const token = await sign({ id: id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, getJwtSecret(c));
+  const token = await sign({ id: id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 }, getJwtSecret(c));
   return c.json({ token, username: body.username });
 });
 
 app.post('/api/auth/login', async (c) => {
+  checkDbBinding(c);
   const body = await c.req.json();
   if (!body.username || !body.password) {
-    return c.json({ error: 'Username and password are required' }, 400);
+    return c.json({ error: 'ユーザー名とパスワードを入力してください' }, 400);
   }
 
   const passHash = await hashPassword(body.password);
@@ -101,14 +115,15 @@ app.post('/api/auth/login', async (c) => {
     .bind(body.username, passHash).first<User>();
 
   if (!user) {
-    return c.json({ error: 'Invalid username or password' }, 401);
+    return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401);
   }
 
-  const token = await sign({ id: user.id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, getJwtSecret(c));
+  const token = await sign({ id: user.id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 }, getJwtSecret(c));
   return c.json({ token, username: user.username });
 });
 
 app.get('/api/auth/me', async (c) => {
+  checkDbBinding(c);
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -125,8 +140,9 @@ app.get('/api/auth/me', async (c) => {
 });
 
 // ================= ITEMS ROUTES =================
-// Middleware to protect /api/items routes
+
 app.use('/api/items/*', async (c, next) => {
+  checkDbBinding(c);
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json({ error: 'Unauthorized' }, 401);

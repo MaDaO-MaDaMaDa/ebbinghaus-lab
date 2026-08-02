@@ -7,6 +7,14 @@
   <meta name="description" content="Scientific Memory Spacing Engine based on Ebbinghaus Forgetting Curve">
   <meta name="theme-color" content="#0b0f19">
 
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ebbinghaus">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -129,24 +137,31 @@
       <div class="lab-panel p-8 rounded max-w-md w-full mx-auto space-y-6 border-t-4 border-t-lab-cyan shadow-2xl">
         <div class="text-center">
           <h1 class="text-2xl font-bold font-mono-lab text-white">EBBINGHAUS<span class="text-lab-cyan">.LOG</span></h1>
-          <p class="text-xs text-lab-muted mt-2 tracking-widest font-mono-lab">SYSTEM_LOGIN</p>
+          <p class="text-xs text-lab-muted mt-2 tracking-widest font-mono-lab" id="auth-title">SYSTEM_LOGIN</p>
+        </div>
+
+        <!-- Mode Toggle Tabs -->
+        <div class="flex border-b border-lab-border text-xs font-bold font-mono-lab">
+          <button type="button" id="auth-mode-login" onclick="toggleAuthMode(false)" class="flex-1 py-2 text-lab-cyan border-b-2 border-lab-cyan text-center">
+            [ログイン]
+          </button>
+          <button type="button" id="auth-mode-register" onclick="toggleAuthMode(true)" class="flex-1 py-2 text-lab-muted text-center hover:text-white">
+            [新規アカウント登録]
+          </button>
         </div>
         
         <form id="auth-form" onsubmit="handleAuth(event)" class="space-y-4">
           <div>
             <label class="block text-xs font-bold text-lab-muted mb-1 font-mono-lab">USERNAME</label>
-            <input type="text" id="auth-username" required class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold font-mono-lab">
+            <input type="text" id="auth-username" required autocomplete="username" placeholder="ユーザー名を入力" class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold font-mono-lab">
           </div>
           <div>
             <label class="block text-xs font-bold text-lab-muted mb-1 font-mono-lab">PASSWORD</label>
-            <input type="password" id="auth-password" required class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold font-mono-lab">
+            <input type="password" id="auth-password" required autocomplete="current-password" placeholder="パスワードを入力" class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold font-mono-lab">
           </div>
           <div class="pt-2">
-            <button type="submit" id="auth-btn-login" class="w-full bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-3 rounded transition shadow-[0_0_15px_rgba(6,182,212,0.3)] mb-3">
+            <button type="submit" id="auth-submit-btn" class="w-full bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-3 rounded transition shadow-[0_0_15px_rgba(6,182,212,0.3)]">
               システムにログイン
-            </button>
-            <button type="button" id="auth-btn-register" onclick="handleAuth(event, true)" class="w-full bg-lab-panel border border-lab-border text-lab-muted hover:text-white font-bold text-sm px-6 py-3 rounded transition">
-              新規アカウント登録
             </button>
           </div>
         </form>
@@ -352,20 +367,47 @@
 
   <!-- SCRIPT LOGIC -->
   <script>
-    // System State
     let itemsState = [];
     let dueItemsState = [];
     let currentView = 'auth';
+    let isRegisterMode = false;
     let userToken = localStorage.getItem('ebbinghaus_token') || null;
     let currentUser = null;
 
-    // Initialize App
     document.addEventListener('DOMContentLoaded', () => {
       startClock();
+      registerServiceWorker();
       checkAuthStatus();
     });
 
-    // Auth Initialization
+    function registerServiceWorker() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+          .then(() => console.log('[PWA] ServiceWorker registered'))
+          .catch((err) => console.log('[PWA] ServiceWorker error:', err));
+      }
+    }
+
+    function toggleAuthMode(register) {
+      isRegisterMode = register;
+      const title = document.getElementById('auth-title');
+      const submitBtn = document.getElementById('auth-submit-btn');
+      const tabLogin = document.getElementById('auth-mode-login');
+      const tabReg = document.getElementById('auth-mode-register');
+
+      if (isRegisterMode) {
+        title.innerText = 'CREATE_NEW_ACCOUNT';
+        submitBtn.innerText = '新規アカウントを作成';
+        tabReg.className = 'flex-1 py-2 text-lab-cyan border-b-2 border-lab-cyan text-center';
+        tabLogin.className = 'flex-1 py-2 text-lab-muted text-center hover:text-white';
+      } else {
+        title.innerText = 'SYSTEM_LOGIN';
+        submitBtn.innerText = 'システムにログイン';
+        tabLogin.className = 'flex-1 py-2 text-lab-cyan border-b-2 border-lab-cyan text-center';
+        tabReg.className = 'flex-1 py-2 text-lab-muted text-center hover:text-white';
+      }
+    }
+
     async function checkAuthStatus() {
       if (!userToken) {
         showAuthScreen();
@@ -376,7 +418,7 @@
           headers: { 'Authorization': 'Bearer ' + userToken }
         });
         if (!res.ok) throw new Error('Token invalid');
-        const data = await res.json();
+        const data = await safeParseJson(res);
         currentUser = data.user;
         
         document.getElementById('header-username').innerText = currentUser.username;
@@ -394,7 +436,8 @@
       document.getElementById('main-header').style.display = 'none';
       document.getElementById('mobile-nav').style.display = 'none';
       ['dashboard', 'history', 'reviews', 'account'].forEach(v => {
-        document.getElementById('view-' + v).classList.add('hidden');
+        const el = document.getElementById('view-' + v);
+        if (el) el.classList.add('hidden');
       });
       document.getElementById('view-auth').classList.remove('hidden');
       currentView = 'auth';
@@ -407,11 +450,20 @@
       switchView('dashboard');
     }
 
-    async function handleAuth(e, isRegister = false) {
+    async function safeParseJson(res) {
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error('サーバーから無効なレスポンスが返されました (' + res.status + ')');
+      }
+    }
+
+    async function handleAuth(e) {
       e.preventDefault();
       const username = document.getElementById('auth-username').value;
       const password = document.getElementById('auth-password').value;
-      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      const endpoint = isRegisterMode ? '/api/auth/register' : '/api/auth/login';
       
       try {
         const res = await fetch(endpoint, {
@@ -419,13 +471,13 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Authentication failed');
+        const data = await safeParseJson(res);
+        if (!res.ok) throw new Error(data.error || '認証に失敗しました');
         
         localStorage.setItem('ebbinghaus_token', data.token);
         userToken = data.token;
         document.getElementById('auth-password').value = '';
-        showToast(isRegister ? 'アカウント作成完了' : 'ログインしました');
+        showToast(isRegisterMode ? 'アカウント作成完了！' : 'ログインしました');
         checkAuthStatus();
       } catch (err) {
         showToast(err.message);
@@ -439,7 +491,6 @@
       showAuthScreen();
     }
 
-    // Real-time Clock
     function startClock() {
       setInterval(() => {
         const now = new Date();
@@ -447,9 +498,8 @@
       }, 1000);
     }
 
-    // View Switching
     function switchView(viewName) {
-      if (currentView === 'auth' && viewName !== 'auth') return; // Prevent switching if not logged in
+      if (currentView === 'auth' && viewName !== 'auth') return;
       currentView = viewName;
       ['dashboard', 'history', 'reviews', 'account'].forEach(v => {
         const el = document.getElementById('view-' + v);
@@ -484,7 +534,6 @@
       if (viewName === 'reviews') renderReviewsView();
     }
 
-    // System Toast Message
     function showToast(msg) {
       const toast = document.getElementById('sys-toast');
       document.getElementById('toast-message').innerText = msg;
@@ -494,7 +543,6 @@
       }, 3500);
     }
 
-    // Helper to get auth headers
     function getHeaders() {
       return {
         'Content-Type': 'application/json',
@@ -502,13 +550,12 @@
       };
     }
 
-    // API Calls
     async function fetchItems() {
       if (!userToken) return;
       try {
         const res = await fetch('/api/items', { headers: getHeaders() });
         if (!res.ok) throw new Error('API Error');
-        const data = await res.json();
+        const data = await safeParseJson(res);
         itemsState = data.items || [];
         
         const todayStr = data.today || new Date().toISOString().split('T')[0];
@@ -519,13 +566,12 @@
         if (currentView === 'history') renderManagementTable();
         if (currentView === 'reviews') renderReviewsView();
       } catch (err) {
-        showToast('FAILED TO FETCH DATA');
+        showToast('データの取得に失敗しました');
         console.error(err);
-        if (err.message === 'API Error') logout(); // Token might be invalid
+        if (err.message === 'API Error') logout();
       }
     }
 
-    // Update Dashboard Indicators
     function updateDashboardMetrics() {
       const dueCount = dueItemsState.length;
       const activeCount = itemsState.filter(i => i.is_completed === 0).length;
@@ -551,7 +597,6 @@
       document.getElementById('metric-strength-bar').style.width = avgStrength + '%';
     }
 
-    // Render Reviews View
     function renderReviewsView() {
       const container = document.getElementById('reviews-container');
       const progressEl = document.getElementById('reviews-progress-indicator');
@@ -610,7 +655,7 @@
         });
         
         if (!res.ok) throw new Error('Update failed');
-        const data = await res.json();
+        const data = await safeParseJson(res);
         
         if(data.item.is_completed === 1) showToast('達成完了: 目標習得率をクリアしました！');
         else showToast('復習完了: 次回の復習日は ' + data.item.next_review_due + ' です');
@@ -621,7 +666,6 @@
       }
     }
 
-    // Render Management Table
     function renderManagementTable() {
       const tbody = document.getElementById('items-table-body');
       const mobileList = document.getElementById('items-mobile-list');
