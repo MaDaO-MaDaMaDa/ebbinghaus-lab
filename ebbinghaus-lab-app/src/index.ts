@@ -126,16 +126,23 @@ app.get('/api/auth/me', async (c) => {
   checkDbBinding(c);
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: 'Unauthorized: No token provided' }, 401);
   }
   const token = authHeader.split(' ')[1];
+  
+  let payload;
   try {
-    const payload = await verify(token, getJwtSecret(c));
+    payload = await verify(token, getJwtSecret(c));
+  } catch (e: any) {
+    return c.json({ error: 'Invalid token: ' + e.message }, 401);
+  }
+
+  try {
     const user = await c.env.DB.prepare('SELECT id, username, created_at FROM users WHERE id = ?').bind(payload.id).first();
-    if (!user) return c.json({ error: 'User not found' }, 404);
+    if (!user) return c.json({ error: 'User not found in DB' }, 404);
     return c.json({ user });
-  } catch (e) {
-    return c.json({ error: 'Invalid token' }, 401);
+  } catch (dbErr: any) {
+    return c.json({ error: 'Database Error: ' + dbErr.message }, 500);
   }
 });
 
