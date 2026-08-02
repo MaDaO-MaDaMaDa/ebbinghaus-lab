@@ -99,7 +99,7 @@ app.post('/api/auth/register', async (c) => {
   await c.env.DB.prepare('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)')
     .bind(id, body.username, passHash).run();
 
-  const token = await sign({ id: id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 }, getJwtSecret(c));
+  const token = await sign({ id: id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 }, getJwtSecret(c), 'HS256');
   return c.json({ token, username: body.username });
 });
 
@@ -118,7 +118,7 @@ app.post('/api/auth/login', async (c) => {
     return c.json({ error: 'ユーザー名またはパスワードが正しくありません' }, 401);
   }
 
-  const token = await sign({ id: user.id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 }, getJwtSecret(c));
+  const token = await sign({ id: user.id, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 }, getJwtSecret(c), 'HS256');
   return c.json({ token, username: user.username });
 });
 
@@ -132,7 +132,7 @@ app.get('/api/auth/me', async (c) => {
   
   let payload;
   try {
-    payload = await verify(token, getJwtSecret(c));
+    payload = await verify(token, getJwtSecret(c), 'HS256');
   } catch (e: any) {
     return c.json({ error: 'Invalid token: ' + e.message }, 401);
   }
@@ -156,7 +156,7 @@ app.use('/api/items/*', async (c, next) => {
   }
   const token = authHeader.split(' ')[1];
   try {
-    const payload = await verify(token, getJwtSecret(c));
+    const payload = await verify(token, getJwtSecret(c), 'HS256');
     c.set('userId', payload.id as string);
     await next();
   } catch (e) {
