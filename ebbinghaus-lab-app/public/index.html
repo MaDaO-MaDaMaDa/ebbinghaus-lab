@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ebbinghaus Memory Lab // Learning Log</title>
+  <meta name="description" content="Scientific Memory Spacing Engine based on Ebbinghaus Forgetting Curve">
+  <meta name="theme-color" content="#0b0f19">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+            sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+          },
+          colors: {
+            lab: {
+              bg: '#080C14',
+              panel: '#0F172A',
+              border: '#1E293B',
+              borderGlow: '#334155',
+              green: '#10B981',
+              cyan: '#06B6D4',
+              red: '#EF4444',
+              yellow: '#F59E0B',
+              text: '#E2E8F0',
+              muted: '#64748B'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: #080C14;
+      color: #E2E8F0;
+      background-image: 
+        linear-gradient(to right, rgba(30, 41, 59, 0.25) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.25) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .scanline {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0.15));
+      background-size: 100% 4px;
+      z-index: 99;
+      opacity: 0.4;
+    }
+
+    .lab-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid #1E293B;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+    }
+    
+    .font-mono-lab {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #080C14; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #06B6D4; }
+  </style>
+</head>
+<body class="h-full flex flex-col antialiased selection:bg-lab-cyan selection:text-black">
+  <div class="scanline"></div>
+
+  <!-- HEADER -->
+  <header class="border-b border-lab-border bg-lab-bg/90 backdrop-blur z-10 sticky top-0" id="main-header" style="display:none;">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-lab-green animate-pulse shadow-[0_0_8px_#10B981]"></div>
+        <span class="font-bold text-sm tracking-wider text-white font-mono-lab">EBBINGHAUS<span class="text-lab-cyan">.LOG</span></span>
+      </div>
+
+      <!-- DESKTOP Nav Tabs -->
+      <nav class="hidden md:flex text-xs font-semibold gap-1 bg-lab-panel p-1 border border-lab-border rounded font-mono-lab">
+        <button onclick="switchView('dashboard')" id="tab-dashboard" class="px-3 py-1.5 rounded transition text-lab-cyan bg-lab-border/50">
+          [01_DASHBOARD]
+        </button>
+        <button onclick="switchView('history')" id="tab-history" class="px-3 py-1.5 rounded transition text-lab-muted hover:text-white">
+          [02_HISTORY]
+        </button>
+        <button onclick="switchView('reviews')" id="tab-reviews" class="px-3 py-1.5 rounded transition text-lab-muted hover:text-white">
+          [03_REVIEWS]
+        </button>
+        <button onclick="switchView('account')" id="tab-account" class="px-3 py-1.5 rounded transition text-lab-muted hover:text-white">
+          [04_ACCOUNT]
+        </button>
+      </nav>
+
+      <div class="text-xs text-lab-muted hidden lg:flex items-center gap-4 font-mono-lab">
+        <span>USER: <span id="header-username" class="text-white">---</span></span>
+        <span>TIME: <span id="clock" class="text-white">--:--:--</span></span>
+        <span class="text-lab-green border border-lab-green/30 px-2 py-0.5 rounded bg-lab-green/10">ONLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 pb-28 md:pb-6 relative z-0">
+
+    <!-- SYSTEM LOG FEEDBACK TOAST -->
+    <div id="sys-toast" class="hidden fixed top-20 right-4 md:bottom-6 md:top-auto md:right-6 z-50 lab-panel p-3 border-l-4 border-lab-cyan max-w-md shadow-2xl transition-all duration-300">
+      <div class="text-xs font-bold text-lab-cyan tracking-widest font-mono-lab">[SYS_NOTIFICATION]</div>
+      <div id="toast-message" class="text-sm font-semibold text-lab-text mt-1"></div>
+    </div>
+
+    <!-- ==================== AUTH VIEW (LOGIN/REGISTER) ==================== -->
+    <section id="view-auth" class="min-h-[70vh] flex items-center justify-center">
+      <div class="lab-panel p-8 rounded max-w-md w-full mx-auto space-y-6 border-t-4 border-t-lab-cyan shadow-2xl">
+        <div class="text-center">
+          <h1 class="text-2xl font-bold font-mono-lab text-white">EBBINGHAUS<span class="text-lab-cyan">.LOG</span></h1>
+          <p class="text-xs text-lab-muted mt-2 tracking-widest font-mono-lab">SYSTEM_LOGIN</p>
+        </div>
+        
+        <form id="auth-form" onsubmit="handleAuth(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-lab-muted mb-1 font-mono-lab">USERNAME</label>
+            <input type="text" id="auth-username" required class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold font-mono-lab">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-lab-muted mb-1 font-mono-lab">PASSWORD</label>
+            <input type="password" id="auth-password" required class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold font-mono-lab">
+          </div>
+          <div class="pt-2">
+            <button type="submit" id="auth-btn-login" class="w-full bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-3 rounded transition shadow-[0_0_15px_rgba(6,182,212,0.3)] mb-3">
+              システムにログイン
+            </button>
+            <button type="button" id="auth-btn-register" onclick="handleAuth(event, true)" class="w-full bg-lab-panel border border-lab-border text-lab-muted hover:text-white font-bold text-sm px-6 py-3 rounded transition">
+              新規アカウント登録
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==================== 01. DASHBOARD VIEW ==================== -->
+    <section id="view-dashboard" class="hidden space-y-6">
+      <!-- Top Metrics Banner -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div class="lab-panel p-4 rounded relative overflow-hidden">
+          <div class="text-xs text-lab-muted font-bold font-mono-lab">REVIEWS_DUE_TODAY</div>
+          <div class="text-3xl font-bold text-lab-yellow mt-2 font-mono-lab" id="metric-due-count">0</div>
+          <div class="text-[10px] text-lab-muted mt-1 font-bold">本日復習すべき項目</div>
+          <div class="absolute top-2 right-2 text-lab-yellow/20 text-4xl font-bold font-mono-lab">01</div>
+        </div>
+
+        <div class="lab-panel p-4 rounded relative overflow-hidden">
+          <div class="text-xs text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
+          <div class="text-3xl font-bold text-lab-cyan mt-2 font-mono-lab" id="metric-active-count">0</div>
+          <div class="text-[10px] text-lab-muted mt-1 font-bold">学習進行中</div>
+          <div class="absolute top-2 right-2 text-lab-cyan/20 text-4xl font-bold font-mono-lab">02</div>
+        </div>
+
+        <div class="lab-panel p-4 rounded relative overflow-hidden">
+          <div class="text-xs text-lab-muted font-bold font-mono-lab">COMPLETED_LOGS</div>
+          <div class="text-3xl font-bold text-lab-green mt-2 font-mono-lab" id="metric-completed-count">0</div>
+          <div class="text-[10px] text-lab-muted mt-1 font-bold">目標達成済み項目</div>
+          <div class="absolute top-2 right-2 text-lab-green/20 text-4xl font-bold font-mono-lab">03</div>
+        </div>
+
+        <div class="lab-panel p-4 rounded relative overflow-hidden">
+          <div class="text-xs text-lab-muted font-bold font-mono-lab">AVG_STRENGTH (ACTIVE)</div>
+          <div class="text-3xl font-bold text-white mt-2 font-mono-lab" id="metric-avg-strength">0.0%</div>
+          <div class="w-full bg-lab-border rounded-full h-1.5 mt-2 overflow-hidden">
+            <div id="metric-strength-bar" class="bg-white h-full w-0 transition-all duration-500"></div>
+          </div>
+          <div class="absolute top-2 right-2 text-white/10 text-4xl font-bold font-mono-lab">04</div>
+        </div>
+      </div>
+      
+      <!-- Welcome Card -->
+      <div class="lab-panel p-6 rounded flex flex-col justify-between border-t-2 border-t-lab-green">
+        <div>
+          <div class="flex justify-between items-start">
+            <span class="text-xs font-bold text-lab-green tracking-wider font-mono-lab">[SYSTEM_READY]</span>
+          </div>
+          <h2 class="text-xl font-bold text-white mt-2">システム稼働中</h2>
+          <p class="text-sm text-lab-muted mt-2 leading-relaxed font-semibold">
+            ログインに成功しました。下部のタブから「学習記録の追加（HISTORY）」または「復習の実施（REVIEWS）」を行ってください。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 02. LOG HISTORY ==================== -->
+    <section id="view-history" class="hidden space-y-6">
+      <div class="flex justify-between items-center border-b border-lab-border pb-4">
+        <div>
+          <span class="text-xs font-bold text-white tracking-wider font-mono-lab">[LOG_HISTORY]</span>
+          <h2 class="text-xl font-bold text-white mt-1">学習記録・履歴</h2>
+        </div>
+        <button onclick="toggleAddItemForm()" class="bg-lab-cyan text-black font-bold px-4 py-2 text-xs rounded hover:bg-cyan-300 transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+          + 新規追加
+        </button>
+      </div>
+
+      <!-- Add New Item Form -->
+      <div id="add-item-form-panel" class="hidden lab-panel p-6 rounded border-l-4 border-l-lab-cyan space-y-4">
+        <h3 class="text-sm font-bold text-white tracking-wider font-mono-lab">[NEW_LOG_ENTRY]</h3>
+        
+        <form onsubmit="handleCreateItem(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-lab-muted mb-1">学習内容 (Topic)</label>
+            <input type="text" id="input-topic" required placeholder="例: 非同期処理(async/await)の仕組み"
+              class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-semibold">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-lab-muted mb-1">メモ・詳細 (Memo) - 任意</label>
+            <textarea id="input-memo" rows="3" placeholder="例: Promiseチェーンを簡潔に書くための糖衣構文。"
+              class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-lab-muted mb-1">目標習得率 (Target Mastery)</label>
+            <select id="input-target" class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-bold">
+              <option value="0.6">60% (浅い定着でOK)</option>
+              <option value="0.8" selected>80% (標準的な定着)</option>
+              <option value="1.0">100% (完全な長期記憶)</option>
+            </select>
+          </div>
+
+          <div class="flex justify-end gap-3 pt-4">
+            <button type="button" onclick="toggleAddItemForm(false)" class="px-5 py-2.5 text-sm font-bold text-lab-muted hover:text-white">
+              キャンセル
+            </button>
+            <button type="submit" class="bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-2.5 rounded transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+              記録を保存
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Data Table List -->
+      <div class="lab-panel rounded overflow-hidden">
+        <div class="p-4 bg-lab-panel/80 border-b border-lab-border flex justify-between items-center">
+          <span class="text-xs font-bold text-lab-muted font-mono-lab">[ALL_LOGS]</span>
+          <span class="text-xs font-bold text-lab-muted font-mono-lab" id="table-count-label">TOTAL: 0</span>
+        </div>
+
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-left text-xs font-semibold">
+            <thead class="bg-lab-bg text-lab-muted uppercase border-b border-lab-border font-mono-lab">
+              <tr>
+                <th class="p-3">STATUS</th>
+                <th class="p-3">TOPIC</th>
+                <th class="p-3">MEMO</th>
+                <th class="p-3">MASTERY</th>
+                <th class="p-3">NEXT DUE</th>
+                <th class="p-3 text-right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="items-table-body" class="divide-y divide-lab-border/50">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div id="items-mobile-list" class="md:hidden flex flex-col divide-y divide-lab-border/50">
+          <!-- Rendered via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 03. DUE REVIEWS VIEW ==================== -->
+    <section id="view-reviews" class="hidden space-y-6">
+      <div class="flex justify-between items-center border-b border-lab-border pb-4">
+        <div>
+          <span class="text-xs font-bold text-lab-yellow tracking-wider font-mono-lab">[DUE_REVIEWS]</span>
+          <h2 class="text-xl font-bold text-white mt-1">本日の復習リスト</h2>
+        </div>
+        <div id="reviews-progress-indicator" class="text-xs font-mono-lab bg-lab-panel px-3 py-1.5 border border-lab-border rounded text-lab-yellow font-bold">
+          DUE: 0
+        </div>
+      </div>
+
+      <div id="reviews-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Dynamic content rendered by JS -->
+      </div>
+    </section>
+
+    <!-- ==================== 04. ACCOUNT VIEW ==================== -->
+    <section id="view-account" class="hidden space-y-6">
+      <div class="flex justify-between items-center border-b border-lab-border pb-4">
+        <div>
+          <span class="text-xs font-bold text-white tracking-wider font-mono-lab">[ACCOUNT_INFO]</span>
+          <h2 class="text-xl font-bold text-white mt-1">アカウント情報</h2>
+        </div>
+      </div>
+
+      <div class="lab-panel p-6 rounded space-y-6">
+        <div>
+          <label class="block text-xs font-bold text-lab-muted mb-1 font-mono-lab">USERNAME</label>
+          <div class="text-lg font-bold text-white font-mono-lab" id="account-username">---</div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-lab-muted mb-1 font-mono-lab">ACCOUNT ID</label>
+          <div class="text-sm font-bold text-lab-muted font-mono-lab" id="account-id">---</div>
+        </div>
+        <div class="pt-4 border-t border-lab-border/50">
+          <button onclick="logout()" class="bg-lab-panel border border-lab-red text-lab-red hover:bg-lab-red hover:text-white font-bold text-sm px-6 py-2.5 rounded transition">
+            ログアウト
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MOBILE BOTTOM NAVIGATION (HIDDEN ON AUTH) -->
+  <nav id="mobile-nav" style="display:none;" class="md:hidden fixed bottom-0 left-0 w-full flex flex-row justify-around bg-lab-panel border-t border-lab-border z-[100] pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+    <button onclick="switchView('dashboard')" id="mob-tab-dashboard" class="flex-1 py-3 transition text-lab-cyan flex flex-col items-center justify-center gap-1">
+      <svg class="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+      <span class="text-[10px] font-bold font-mono-lab">DASHBOARD</span>
+    </button>
+    <button onclick="switchView('history')" id="mob-tab-history" class="flex-1 py-3 transition text-lab-muted hover:text-white flex flex-col items-center justify-center gap-1">
+      <svg class="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+      <span class="text-[10px] font-bold font-mono-lab">HISTORY</span>
+    </button>
+    <button onclick="switchView('reviews')" id="mob-tab-reviews" class="flex-1 py-3 transition text-lab-muted hover:text-white flex flex-col items-center justify-center gap-1 relative">
+      <svg class="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <span class="text-[10px] font-bold font-mono-lab">REVIEWS</span>
+      <div id="mob-nav-badge" class="hidden absolute top-2 right-6 w-3 h-3 bg-lab-yellow rounded-full border-2 border-lab-panel"></div>
+    </button>
+    <button onclick="switchView('account')" id="mob-tab-account" class="flex-1 py-3 transition text-lab-muted hover:text-white flex flex-col items-center justify-center gap-1 relative">
+      <svg class="w-6 h-6 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <span class="text-[10px] font-bold font-mono-lab">ACCOUNT</span>
+    </button>
+  </nav>
+
+  <!-- SCRIPT LOGIC -->
+  <script>
+    // System State
+    let itemsState = [];
+    let dueItemsState = [];
+    let currentView = 'auth';
+    let userToken = localStorage.getItem('ebbinghaus_token') || null;
+    let currentUser = null;
+
+    // Initialize App
+    document.addEventListener('DOMContentLoaded', () => {
+      startClock();
+      checkAuthStatus();
+    });
+
+    // Auth Initialization
+    async function checkAuthStatus() {
+      if (!userToken) {
+        showAuthScreen();
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': 'Bearer ' + userToken }
+        });
+        if (!res.ok) throw new Error('Token invalid');
+        const data = await res.json();
+        currentUser = data.user;
+        
+        document.getElementById('header-username').innerText = currentUser.username;
+        document.getElementById('account-username').innerText = currentUser.username;
+        document.getElementById('account-id').innerText = currentUser.id;
+        
+        showAppScreen();
+        fetchItems();
+      } catch (e) {
+        logout();
+      }
+    }
+
+    function showAuthScreen() {
+      document.getElementById('main-header').style.display = 'none';
+      document.getElementById('mobile-nav').style.display = 'none';
+      ['dashboard', 'history', 'reviews', 'account'].forEach(v => {
+        document.getElementById('view-' + v).classList.add('hidden');
+      });
+      document.getElementById('view-auth').classList.remove('hidden');
+      currentView = 'auth';
+    }
+
+    function showAppScreen() {
+      document.getElementById('main-header').style.display = 'block';
+      document.getElementById('mobile-nav').style.display = 'flex';
+      document.getElementById('view-auth').classList.add('hidden');
+      switchView('dashboard');
+    }
+
+    async function handleAuth(e, isRegister = false) {
+      e.preventDefault();
+      const username = document.getElementById('auth-username').value;
+      const password = document.getElementById('auth-password').value;
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Authentication failed');
+        
+        localStorage.setItem('ebbinghaus_token', data.token);
+        userToken = data.token;
+        document.getElementById('auth-password').value = '';
+        showToast(isRegister ? 'アカウント作成完了' : 'ログインしました');
+        checkAuthStatus();
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('ebbinghaus_token');
+      userToken = null;
+      currentUser = null;
+      showAuthScreen();
+    }
+
+    // Real-time Clock
+    function startClock() {
+      setInterval(() => {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
+      }, 1000);
+    }
+
+    // View Switching
+    function switchView(viewName) {
+      if (currentView === 'auth' && viewName !== 'auth') return; // Prevent switching if not logged in
+      currentView = viewName;
+      ['dashboard', 'history', 'reviews', 'account'].forEach(v => {
+        const el = document.getElementById('view-' + v);
+        const tab = document.getElementById('tab-' + v);
+        const mobTab = document.getElementById('mob-tab-' + v);
+
+        if (v === viewName) {
+          el?.classList.remove('hidden');
+          if(tab) {
+            tab.classList.add('text-lab-cyan', 'bg-lab-border/50');
+            tab.classList.remove('text-lab-muted');
+          }
+          if(mobTab) {
+            mobTab.classList.add('text-lab-cyan');
+            mobTab.classList.remove('text-lab-muted');
+          }
+        } else {
+          el?.classList.add('hidden');
+          if(tab) {
+            tab.classList.remove('text-lab-cyan', 'bg-lab-border/50');
+            tab.classList.add('text-lab-muted');
+          }
+          if(mobTab) {
+            mobTab.classList.remove('text-lab-cyan');
+            mobTab.classList.add('text-lab-muted');
+          }
+        }
+      });
+
+      if (viewName === 'dashboard') updateDashboardMetrics();
+      if (viewName === 'history') renderManagementTable();
+      if (viewName === 'reviews') renderReviewsView();
+    }
+
+    // System Toast Message
+    function showToast(msg) {
+      const toast = document.getElementById('sys-toast');
+      document.getElementById('toast-message').innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3500);
+    }
+
+    // Helper to get auth headers
+    function getHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + userToken
+      };
+    }
+
+    // API Calls
+    async function fetchItems() {
+      if (!userToken) return;
+      try {
+        const res = await fetch('/api/items', { headers: getHeaders() });
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        itemsState = data.items || [];
+        
+        const todayStr = data.today || new Date().toISOString().split('T')[0];
+        const activeItems = itemsState.filter(item => item.is_completed === 0);
+        dueItemsState = activeItems.filter(item => !item.next_review_due || item.next_review_due <= todayStr);
+        
+        updateDashboardMetrics();
+        if (currentView === 'history') renderManagementTable();
+        if (currentView === 'reviews') renderReviewsView();
+      } catch (err) {
+        showToast('FAILED TO FETCH DATA');
+        console.error(err);
+        if (err.message === 'API Error') logout(); // Token might be invalid
+      }
+    }
+
+    // Update Dashboard Indicators
+    function updateDashboardMetrics() {
+      const dueCount = dueItemsState.length;
+      const activeCount = itemsState.filter(i => i.is_completed === 0).length;
+      const completedCount = itemsState.filter(i => i.is_completed === 1).length;
+      
+      document.getElementById('metric-due-count').innerText = dueCount;
+      document.getElementById('metric-active-count').innerText = activeCount;
+      document.getElementById('metric-completed-count').innerText = completedCount;
+
+      const mobBadge = document.getElementById('mob-nav-badge');
+      if (mobBadge) {
+        if(dueCount > 0) mobBadge.classList.remove('hidden');
+        else mobBadge.classList.add('hidden');
+      }
+
+      let avgStrength = 0;
+      if (activeCount > 0) {
+        const sum = itemsState.filter(i => i.is_completed === 0).reduce((acc, i) => acc + (i.memory_strength || 0), 0);
+        avgStrength = Math.round((sum / activeCount) * 100);
+      }
+      
+      document.getElementById('metric-avg-strength').innerText = avgStrength + '%';
+      document.getElementById('metric-strength-bar').style.width = avgStrength + '%';
+    }
+
+    // Render Reviews View
+    function renderReviewsView() {
+      const container = document.getElementById('reviews-container');
+      const progressEl = document.getElementById('reviews-progress-indicator');
+      
+      if(progressEl) progressEl.innerText = 'DUE: ' + dueItemsState.length;
+
+      if (dueItemsState.length === 0) {
+        container.innerHTML = 
+          '<div class="col-span-full lab-panel p-8 text-center rounded space-y-4">' +
+            '<div class="text-lab-green font-bold text-lg font-mono-lab">[ALL_CAUGHT_UP]</div>' +
+            '<p class="text-sm font-semibold text-lab-muted">本日復習すべき学習記録はありません。素晴らしいペースです！</p>' +
+            '<button onclick="switchView(\'dashboard\')" class="bg-lab-green/20 border border-lab-green text-lab-green px-4 py-3 rounded text-sm font-bold hover:bg-lab-green hover:text-black transition">' +
+              'ダッシュボードに戻る' +
+            '</button>' +
+          '</div>';
+        return;
+      }
+
+      container.innerHTML = dueItemsState.map(function(item) {
+        const currentPct = Math.round((item.memory_strength || 0) * 100);
+        const targetPct = Math.round((item.target_mastery || 1) * 100);
+        return (
+        '<div class="lab-panel p-6 rounded space-y-5 flex flex-col justify-between relative overflow-hidden">' +
+          '<div>' +
+            '<div class="flex justify-between items-center text-xs text-lab-muted border-b border-lab-border pb-3 font-mono-lab font-bold">' +
+              '<span>INTERVAL: ' + item.interval_days + 'd</span>' +
+              '<span>MEM: <span class="text-white">' + currentPct + '%</span> / TGT: <span class="text-lab-cyan">' + targetPct + '%</span></span>' +
+            '</div>' +
+            '<div class="mt-4">' +
+              '<span class="text-[10px] text-lab-yellow uppercase font-bold tracking-wider font-mono-lab">[TOPIC]</span>' +
+              '<div class="text-lg font-bold text-white mt-1">' + escapeHtml(item.topic) + '</div>' +
+            '</div>' +
+            (item.memo ? (
+            '<div class="mt-4">' +
+              '<span class="text-[10px] text-lab-muted uppercase font-bold tracking-wider font-mono-lab">[MEMO]</span>' +
+              '<div class="text-sm text-lab-text mt-1 bg-lab-bg/50 p-3 rounded border border-lab-border whitespace-pre-wrap font-medium">' + escapeHtml(item.memo) + '</div>' +
+            '</div>'
+            ) : '') +
+          '</div>' +
+          '<div class="pt-5 border-t border-lab-border mt-auto">' +
+            '<button onclick="executeReview(\'' + item.id + '\')" class="bg-lab-yellow text-black hover:bg-yellow-400 font-bold text-sm px-6 py-4 rounded transition w-full shadow-[0_0_10px_rgba(245,158,11,0.2)]">' +
+              '復習完了としてマーク (次回間隔UP)' +
+            '</button>' +
+          '</div>' +
+        '</div>'
+        );
+      }).join('');
+    }
+
+    async function executeReview(id) {
+      try {
+        const res = await fetch('/api/items/' + id + '/review', {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify({})
+        });
+        
+        if (!res.ok) throw new Error('Update failed');
+        const data = await res.json();
+        
+        if(data.item.is_completed === 1) showToast('達成完了: 目標習得率をクリアしました！');
+        else showToast('復習完了: 次回の復習日は ' + data.item.next_review_due + ' です');
+        
+        fetchItems();
+      } catch (err) {
+        showToast('FAILED TO UPDATE REVIEW STATUS');
+      }
+    }
+
+    // Render Management Table
+    function renderManagementTable() {
+      const tbody = document.getElementById('items-table-body');
+      const mobileList = document.getElementById('items-mobile-list');
+      document.getElementById('table-count-label').innerText = 'TOTAL: ' + itemsState.length;
+
+      if (itemsState.length === 0) {
+        const emptyMsg = 
+          '<div class="p-8 text-center text-sm font-semibold text-lab-muted">' +
+            '学習記録がありません。上の「+ 新規追加」から登録してください。' +
+          '</div>';
+        tbody.innerHTML = '<tr><td colspan="6">' + emptyMsg + '</td></tr>';
+        mobileList.innerHTML = emptyMsg;
+        return;
+      }
+
+      const rowMapper = function(item) {
+        const currentPct = Math.round((item.memory_strength || 0) * 100);
+        const targetPct = Math.round((item.target_mastery || 1) * 100);
+        const isCompleted = item.is_completed === 1;
+        const statusBadge = isCompleted 
+          ? '<span class="bg-lab-green/20 text-lab-green border border-lab-green px-2 py-0.5 rounded text-[10px] font-bold font-mono-lab">ACHIEVED</span>'
+          : '<span class="bg-lab-cyan/20 text-lab-cyan border border-lab-cyan px-2 py-0.5 rounded text-[10px] font-bold font-mono-lab">ACTIVE</span>';
+        return { item, currentPct, targetPct, isCompleted, statusBadge };
+      };
+
+      tbody.innerHTML = itemsState.map(rowMapper).map(function(obj) {
+        const { item, currentPct, targetPct, isCompleted, statusBadge } = obj;
+        return (
+        '<tr class="hover:bg-lab-panel/50 transition ' + (isCompleted ? 'opacity-60' : '') + '">' +
+          '<td class="p-3">' + statusBadge + '</td>' +
+          '<td class="p-3 font-bold text-white max-w-xs truncate">' + escapeHtml(item.topic) + '</td>' +
+          '<td class="p-3 text-lab-muted max-w-xs truncate">' + escapeHtml(item.memo || '-') + '</td>' +
+          '<td class="p-3">' +
+            '<div class="flex flex-col gap-1">' +
+              '<span class="font-mono-lab text-xs font-bold text-white">' + currentPct + '% <span class="text-lab-muted">/ ' + targetPct + '%</span></span>' +
+              '<div class="w-16 bg-lab-border rounded-full h-1 overflow-hidden">' +
+                '<div class="' + (isCompleted ? 'bg-lab-green' : 'bg-lab-cyan') + ' h-full" style="width: ' + Math.min(100, currentPct) + '%"></div>' +
+              '</div>' +
+            '</div>' +
+          '</td>' +
+          '<td class="p-3 font-mono-lab text-xs font-bold ' + (isCompleted ? 'text-lab-muted' : 'text-lab-yellow') + '">' + (item.next_review_due || 'N/A') + '</td>' +
+          '<td class="p-3 text-right">' +
+            '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red hover:underline text-xs font-bold py-1 px-2">DEL</button>' +
+          '</td>' +
+        '</tr>'
+        );
+      }).join('');
+
+      mobileList.innerHTML = itemsState.map(rowMapper).map(function(obj) {
+        const { item, currentPct, targetPct, isCompleted, statusBadge } = obj;
+        return (
+        '<div class="p-5 flex flex-col gap-3 hover:bg-lab-panel/50 transition ' + (isCompleted ? 'opacity-70' : '') + '">' +
+          '<div class="flex justify-between items-start gap-2">' +
+            '<div>' +
+              '<div class="font-bold text-white text-base mb-1">' + escapeHtml(item.topic) + '</div>' +
+              (item.memo ? '<div class="text-sm font-medium text-lab-muted line-clamp-2">' + escapeHtml(item.memo) + '</div>' : '') +
+            '</div>' +
+            '<div class="mt-1">' + statusBadge + '</div>' +
+          '</div>' +
+          '<div class="flex items-center justify-between mt-2 pt-3 border-t border-lab-border/50">' +
+            '<div class="flex flex-col gap-1">' +
+              '<span class="text-[10px] text-lab-muted font-bold font-mono-lab">MASTERY</span>' +
+              '<span class="text-sm font-bold font-mono-lab text-white">' + currentPct + '% <span class="text-xs text-lab-muted">/ ' + targetPct + '%</span></span>' +
+            '</div>' +
+            '<div class="flex flex-col gap-1 text-right">' +
+              '<span class="text-[10px] text-lab-muted font-bold font-mono-lab">NEXT DUE</span>' +
+              '<span class="text-sm font-bold font-mono-lab ' + (isCompleted ? 'text-lab-muted' : 'text-lab-yellow') + '">' + (item.next_review_due || 'N/A') + '</span>' +
+            '</div>' +
+            '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red bg-lab-red/10 border border-lab-red/50 hover:bg-lab-red hover:text-white rounded font-bold px-3 py-2 transition text-xs ml-2">削除</button>' +
+          '</div>' +
+        '</div>'
+        );
+      }).join('');
+    }
+
+    function toggleAddItemForm(show = null) {
+      const panel = document.getElementById('add-item-form-panel');
+      if (show === true) {
+        panel.classList.remove('hidden');
+        document.getElementById('input-topic').focus();
+      } else if (show === false) {
+        panel.classList.add('hidden');
+      } else {
+        panel.classList.toggle('hidden');
+        if(!panel.classList.contains('hidden')) document.getElementById('input-topic').focus();
+      }
+    }
+
+    async function handleCreateItem(e) {
+      e.preventDefault();
+      const topic = document.getElementById('input-topic').value;
+      const memo = document.getElementById('input-memo').value;
+      const target_mastery = parseFloat(document.getElementById('input-target').value);
+
+      try {
+        const res = await fetch('/api/items', {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ topic, memo, target_mastery })
+        });
+        if (!res.ok) throw new Error('Create failed');
+
+        showToast('新しい学習記録を追加しました');
+        document.getElementById('input-topic').value = '';
+        document.getElementById('input-memo').value = '';
+        toggleAddItemForm(false);
+        fetchItems();
+      } catch (err) {
+        showToast('記録の保存に失敗しました');
+      }
+    }
+
+    async function deleteItem(id) {
+      if (!confirm('この記録を削除してもよろしいですか？')) return;
+      try {
+        const res = await fetch('/api/items/' + id, { method: 'DELETE', headers: getHeaders() });
+        if (!res.ok) throw new Error('Delete failed');
+        showToast('記録を削除しました');
+        fetchItems();
+      } catch (err) {
+        showToast('削除に失敗しました');
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+  </script>
+</body>
+</html>
