@@ -1,5 +1,4 @@
+import { handle } from 'hono/cloudflare-pages';
 import app from '../../src/index';
 
-export const onRequest = (context: any) => {
-  return app.fetch(context.request, context.env, context);
-};
+export const onRequest = handle(app);
