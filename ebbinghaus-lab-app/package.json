@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify"
+    "deploy": "wrangler deploy --minify",
+    "secret:pub": "wrangler secret put VAPID_PUBLIC_KEY",
+    "secret:priv": "wrangler secret put VAPID_PRIVATE_JWK"
   },
   "dependencies": {
     "hono": "^4.0.0"
