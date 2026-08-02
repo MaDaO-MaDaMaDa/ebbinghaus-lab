@@ -170,6 +170,118 @@
 
     <!-- ==================== 01. DASHBOARD VIEW ==================== -->
     <section id="view-dashboard" class="hidden space-y-6">
+      
+      <!-- Animated Forgetting Curve -->
+      <div class="lab-panel p-4 md:p-6 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl">
+        <div class="flex justify-between items-start mb-2 md:mb-4 relative z-10">
+          <div class="space-y-1">
+            <span class="text-xs font-bold text-lab-cyan tracking-wider font-mono-lab">[MEMORY_MODEL]</span>
+            <h2 class="text-lg md:text-xl font-bold text-white">エビングハウスの忘却曲線</h2>
+          </div>
+          <div class="text-[10px] text-lab-muted font-mono-lab hidden sm:block">RETENTION vs TIME</div>
+        </div>
+        
+        <div class="w-full overflow-hidden relative mt-2 md:mt-0">
+          <svg viewBox="0 0 800 250" class="w-full h-auto drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="curveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#EF4444" />
+                <stop offset="100%" stop-color="#F59E0B" />
+              </linearGradient>
+              <linearGradient id="curveGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#F59E0B" />
+                <stop offset="100%" stop-color="#10B981" />
+              </linearGradient>
+              <linearGradient id="curveGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#10B981" />
+                <stop offset="100%" stop-color="#06B6D4" />
+              </linearGradient>
+              
+              <style>
+                .draw-line {
+                  stroke-dasharray: 1000;
+                  stroke-dashoffset: 1000;
+                  animation: draw 3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                }
+                .delay-1 { animation-delay: 1.5s; }
+                .delay-2 { animation-delay: 3.0s; }
+                .delay-3 { animation-delay: 4.5s; }
+                
+                .fade-in {
+                  opacity: 0;
+                  animation: fadeIn 0.5s ease forwards;
+                }
+                .delay-fade-1 { animation-delay: 1.3s; }
+                .delay-fade-2 { animation-delay: 2.8s; }
+                .delay-fade-3 { animation-delay: 4.3s; }
+                
+                @keyframes draw {
+                  to { stroke-dashoffset: 0; }
+                }
+                @keyframes fadeIn {
+                  to { opacity: 1; }
+                }
+                @keyframes pulse-dot {
+                  0%, 100% { transform: scale(1); opacity: 1; }
+                  50% { transform: scale(1.5); opacity: 0.5; }
+                }
+                .dot-animate {
+                  animation: pulse-dot 2s infinite;
+                }
+              </style>
+            </defs>
+
+            <!-- Grid lines & Axes -->
+            <g stroke="#1E293B" stroke-width="1" stroke-dasharray="4 4">
+              <line x1="50" y1="20" x2="750" y2="20" />
+              <line x1="50" y1="80" x2="750" y2="80" />
+              <line x1="50" y1="140" x2="750" y2="140" />
+              <line x1="50" y1="200" x2="750" y2="200" />
+            </g>
+            <g stroke="#334155" stroke-width="2">
+              <line x1="50" y1="20" x2="50" y2="200" />
+              <line x1="50" y1="200" x2="750" y2="200" />
+            </g>
+
+            <!-- Labels -->
+            <g fill="#64748B" font-family="'JetBrains Mono', monospace" font-size="10">
+              <text x="15" y="25">100%</text>
+              <text x="20" y="85">75%</text>
+              <text x="20" y="145">50%</text>
+              <text x="20" y="205">25%</text>
+              
+              <text x="50" y="220" text-anchor="middle">Day 0</text>
+              <text x="250" y="220" text-anchor="middle">Day 1</text>
+              <text x="450" y="220" text-anchor="middle">Day 3</text>
+              <text x="650" y="220" text-anchor="middle">Day 7</text>
+            </g>
+
+            <!-- Curve 1 (Initial Learning) -->
+            <path class="draw-line" d="M 50 20 Q 150 150 250 170" fill="none" stroke="url(#curveGrad1)" stroke-width="4" stroke-linecap="round" />
+            
+            <!-- Review 1 -->
+            <line class="fade-in delay-fade-1" x1="250" y1="170" x2="250" y2="20" stroke="#10B981" stroke-width="2" stroke-dasharray="4" />
+            <circle class="fade-in delay-fade-1 dot-animate" cx="250" cy="20" r="5" fill="#10B981" style="transform-origin: 250px 20px" />
+            <path class="draw-line delay-1" d="M 250 20 Q 350 120 450 140" fill="none" stroke="url(#curveGrad2)" stroke-width="4" stroke-linecap="round" />
+
+            <!-- Review 2 -->
+            <line class="fade-in delay-fade-2" x1="450" y1="140" x2="450" y2="20" stroke="#06B6D4" stroke-width="2" stroke-dasharray="4" />
+            <circle class="fade-in delay-fade-2 dot-animate" cx="450" cy="20" r="5" fill="#06B6D4" style="transform-origin: 450px 20px" />
+            <path class="draw-line delay-2" d="M 450 20 Q 550 70 650 80" fill="none" stroke="url(#curveGrad3)" stroke-width="4" stroke-linecap="round" />
+
+            <!-- Review 3 (Optimal) -->
+            <line class="fade-in delay-fade-3" x1="650" y1="80" x2="650" y2="20" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="4" />
+            <circle class="fade-in delay-fade-3 dot-animate" cx="650" cy="20" r="5" fill="#E2E8F0" style="transform-origin: 650px 20px" />
+            <path class="draw-line delay-3" d="M 650 20 Q 700 25 750 30" fill="none" stroke="#E2E8F0" stroke-width="4" stroke-linecap="round" />
+            
+            <!-- Legends -->
+            <g class="fade-in delay-fade-3" font-family="'Noto Sans JP', sans-serif" font-size="11" font-weight="bold">
+              <text x="400" y="240" fill="#E2E8F0" text-anchor="middle">復習のたびに忘却スピードが緩やかに（記憶の定着）</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
       <!-- Top Metrics Banner -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -204,18 +316,6 @@
         </div>
       </div>
       
-      <!-- Welcome Card -->
-      <div class="lab-panel p-6 rounded flex flex-col justify-between border-t-2 border-t-lab-green">
-        <div>
-          <div class="flex justify-between items-start">
-            <span class="text-xs font-bold text-lab-green tracking-wider font-mono-lab">[SYSTEM_READY]</span>
-          </div>
-          <h2 class="text-xl font-bold text-white mt-2">システム稼働中</h2>
-          <p class="text-sm text-lab-muted mt-2 leading-relaxed font-semibold">
-            ログインに成功しました。下部のタブから「学習記録の追加（HISTORY）」または「復習の実施（REVIEWS）」を行ってください。
-          </p>
-        </div>
-      </div>
     </section>
 
     <!-- ==================== 02. LOG HISTORY ==================== -->
