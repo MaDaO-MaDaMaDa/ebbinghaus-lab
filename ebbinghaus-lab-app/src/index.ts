@@ -380,28 +380,35 @@ async function sendWebPush(subscription: any, env: Bindings) {
   }
 }
 
+async function triggerCron(env: Bindings) {
+  const today = formatDate(new Date());
+  const { results: dueItems } = await env.DB.prepare(
+    'SELECT DISTINCT user_id FROM items WHERE is_completed = 0 AND next_review_due <= ?'
+  ).bind(today).all();
+  
+  if (!dueItems || dueItems.length === 0) return;
+  
+  const dueUserIds = dueItems.map(item => (item as any).user_id);
+  const placeholders = dueUserIds.map(() => '?').join(',');
+  const { results: subscriptions } = await env.DB.prepare(
+    `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
+  ).bind(...dueUserIds).all();
+  
+  if (!subscriptions) return;
+  
+  for (const sub of subscriptions) {
+    await sendWebPush(sub, env);
+  }
+}
+
+app.get('/api/cron/trigger', async (c) => {
+  await triggerCron(c.env);
+  return c.json({ success: true, message: 'Cron logic triggered manually for testing.' });
+});
+
 export default {
   fetch: app.fetch,
   scheduled: async (event: any, env: Bindings, ctx: any) => {
-    ctx.waitUntil((async () => {
-      const today = formatDate(new Date());
-      const { results: dueItems } = await env.DB.prepare(
-        'SELECT DISTINCT user_id FROM items WHERE is_completed = 0 AND next_review_due <= ?'
-      ).bind(today).all();
-      
-      if (!dueItems || dueItems.length === 0) return;
-      
-      const dueUserIds = dueItems.map(item => (item as any).user_id);
-      const placeholders = dueUserIds.map(() => '?').join(',');
-      const { results: subscriptions } = await env.DB.prepare(
-        `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
-      ).bind(...dueUserIds).all();
-      
-      if (!subscriptions) return;
-      
-      for (const sub of subscriptions) {
-        await sendWebPush(sub, env);
-      }
-    })());
+    ctx.waitUntil(triggerCron(env));
   }
 };
