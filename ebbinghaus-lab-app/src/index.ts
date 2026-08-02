@@ -146,6 +146,42 @@ app.get('/api/auth/me', async (c) => {
   }
 });
 
+app.put('/api/auth/password', async (c) => {
+  checkDbBinding(c);
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized: No token provided' }, 401);
+  }
+  const token = authHeader.split(' ')[1];
+  
+  let payload;
+  try {
+    payload = await verify(token, getJwtSecret(c), 'HS256');
+  } catch (e: any) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  const body = await c.req.json();
+  if (!body.currentPassword || !body.newPassword) {
+    return c.json({ error: '現在のパスワードと新しいパスワードを入力してください' }, 400);
+  }
+
+  const currentHash = await hashPassword(body.currentPassword);
+  
+  const user = await c.env.DB.prepare('SELECT id FROM users WHERE id = ? AND password_hash = ?')
+    .bind(payload.id, currentHash).first();
+    
+  if (!user) {
+    return c.json({ error: '現在のパスワードが正しくありません' }, 401);
+  }
+
+  const newHash = await hashPassword(body.newPassword);
+  await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+    .bind(newHash, payload.id).run();
+
+  return c.json({ success: true });
+});
+
 // ================= ITEMS ROUTES =================
 
 app.use('/api/items/*', async (c, next) => {
