@@ -23,3 +23,14 @@ CREATE TABLE items (
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  keys_p256dh TEXT,
+  keys_auth TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, endpoint),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

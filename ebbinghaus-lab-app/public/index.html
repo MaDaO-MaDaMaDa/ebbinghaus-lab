@@ -118,7 +118,7 @@
       <div class="flex items-center gap-3">
         <div class="w-3 h-3 rounded-full bg-lab-green animate-pulse shadow-[0_0_8px_#10B981]"></div>
         <span class="font-bold text-sm tracking-wider text-white font-mono-lab">EBBINGHAUS<span
-            class="text-lab-cyan">.LOG</span></span>
+            class="text-lab-cyan">.LAB</span></span>
       </div>
 
       <!-- DESKTOP Nav Tabs -->
@@ -222,17 +222,9 @@
     <section id="view-dashboard" class="hidden space-y-6">
 
       <!-- Animated Forgetting Curve -->
-      <div class="lab-panel p-4 md:p-6 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl">
-        <div class="flex justify-between items-start mb-2 md:mb-4 relative z-10">
-          <div class="space-y-1">
-            <span class="text-xs font-bold text-lab-cyan tracking-wider font-mono-lab">[MEMORY_MODEL]</span>
-            <h2 class="text-lg md:text-xl font-bold text-white">エビングハウスの忘却曲線</h2>
-          </div>
-          <div class="text-[10px] text-lab-muted font-mono-lab hidden sm:block">RETENTION vs TIME</div>
-        </div>
-
-        <div class="w-full overflow-hidden relative mt-2 md:mt-0">
-          <svg viewBox="0 0 800 250" class="w-full h-auto drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
+      <div class="lab-panel p-4 md:p-6 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl flex flex-col justify-center" style="min-h: 30vh; max-h: 40vh;">
+        <div class="w-full overflow-hidden relative flex items-center justify-center h-full">
+          <svg id="ebbinghaus-svg" viewBox="0 0 800 200" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="curveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#EF4444" />
@@ -372,10 +364,6 @@
             <path class="draw-line delay-3" d="M 650 20 Q 700 25 750 30" fill="none" stroke="url(#curveGrad4)"
               stroke-width="4" stroke-linecap="round" />
 
-            <!-- Legends -->
-            <g class="fade-in delay-fade-3" font-family="'Noto Sans JP', sans-serif" font-size="11" font-weight="bold">
-              <text x="400" y="240" fill="#EC4899" text-anchor="middle">復習のたびに忘却スピードが緩やかに（記憶の定着完了 ✨）</text>
-            </g>
           </svg>
         </div>
       </div>
@@ -436,13 +424,13 @@
         <form onsubmit="handleCreateItem(event)" class="space-y-4">
           <div>
             <label class="block text-xs font-bold text-lab-muted mb-1">学習内容 (Topic)</label>
-            <input type="text" id="input-topic" required placeholder="例: 非同期処理(async/await)の仕組み"
+            <input type="text" id="input-topic" required placeholder="例: ドイツの心理学者エビングハウスが提唱した忘却曲線"
               class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-semibold">
           </div>
 
           <div>
             <label class="block text-xs font-bold text-lab-muted mb-1">メモ・詳細 (Memo) - 任意</label>
-            <textarea id="input-memo" rows="3" placeholder="例: Promiseチェーンを簡潔に書くための糖衣構文。"
+            <textarea id="input-memo" rows="3" placeholder="例: 20分後に42%、1日後に74%を忘却する。定期的な復習によって定着率を高めることができる。"
               class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan"></textarea>
           </div>
 
@@ -540,7 +528,6 @@
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-md font-bold text-white">復習タイミングの通知</h3>
-              <p class="text-xs text-lab-muted mt-1">復習の時間になった際にプッシュ通知を受け取ります。</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="notification-toggle" class="sr-only peer"
@@ -840,10 +827,29 @@
         }
       });
 
-      if (viewName === 'dashboard') updateDashboardMetrics();
+      if (viewName === 'dashboard') {
+        updateDashboardMetrics();
+        // Trigger SVG animation replay
+        const svg = document.getElementById('ebbinghaus-svg');
+        if (svg) {
+          const newSvg = svg.cloneNode(true);
+          svg.parentNode.replaceChild(newSvg, svg);
+        }
+      }
       if (viewName === 'history') renderManagementTable();
       if (viewName === 'reviews') renderReviewsView();
     }
+
+    // Loop dashboard animation
+    setInterval(() => {
+      if (currentView === 'dashboard') {
+        const svg = document.getElementById('ebbinghaus-svg');
+        if (svg) {
+          const newSvg = svg.cloneNode(true);
+          svg.parentNode.replaceChild(newSvg, svg);
+        }
+      }
+    }, 6000);
 
     function showToast(msg) {
       const toast = document.getElementById('sys-toast');
@@ -1131,10 +1137,33 @@
           e.target.checked = false;
           return;
         }
-        Notification.requestPermission().then(permission => {
+        Notification.requestPermission().then(async permission => {
           if (permission === 'granted') {
-            showToast('通知が許可されました。復習の時間にお知らせします！');
-            // TODO: Web Pushの場合はここでServiceWorkerとPushManagerへの登録を行う
+            try {
+              const sw = await navigator.serviceWorker.register('/sw.js');
+              const vapidRes = await fetch('/api/notifications/vapid-key', { headers: getHeaders() });
+              const { publicKey } = await vapidRes.json();
+              
+              if (!publicKey) throw new Error('VAPID public key not found');
+              
+              const subscription = await sw.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: publicKey
+              });
+
+              const res = await fetch('/api/notifications/subscribe', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(subscription)
+              });
+              
+              if (!res.ok) throw new Error('Subscription failed');
+              showToast('通知が許可されました。復習の時間にお知らせします！');
+            } catch (err) {
+              console.error(err);
+              showToast('通知の登録に失敗しました: ' + err.message);
+              e.target.checked = false;
+            }
           } else {
             showToast('通知がブロックされました。ブラウザの設定をご確認ください。');
             e.target.checked = false;

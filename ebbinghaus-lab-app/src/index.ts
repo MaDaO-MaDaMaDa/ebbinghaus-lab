@@ -4,6 +4,8 @@ import { sign, verify } from 'hono/jwt';
 type Bindings = {
   DB: D1Database;
   JWT_SECRET?: string;
+  VAPID_PUBLIC_KEY: string;
+  VAPID_PRIVATE_JWK: string;
 };
 
 type Item = {
@@ -284,4 +286,122 @@ app.delete('/api/items/:id', async (c) => {
   }
 });
 
-export default app;
+app.get('/api/notifications/vapid-key', async (c) => {
+  return c.json({ publicKey: c.env.VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/notifications/subscribe', async (c) => {
+  const userId = c.get('userId');
+  try {
+    const subscription = await c.req.json();
+    const endpoint = subscription.endpoint;
+    const keys_p256dh = subscription.keys?.p256dh || null;
+    const keys_auth = subscription.keys?.auth || null;
+    
+    await c.env.DB.prepare(
+      `INSERT INTO subscriptions (user_id, endpoint, keys_p256dh, keys_auth)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id, endpoint) DO UPDATE SET keys_p256dh = excluded.keys_p256dh, keys_auth = excluded.keys_auth`
+    ).bind(userId, endpoint, keys_p256dh, keys_auth).run();
+    
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.get('/api/notifications/pending', async (c) => {
+  // This endpoint is called by the Service Worker during a 'push' event.
+  // We can just return the generic message.
+  return c.json({
+    title: '復習の時間です！',
+    body: 'エビングハウス・ラボで本日の学習ログを復習しましょう。'
+  });
+});
+
+// Helper for JWT encoding
+function b64url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+async function sendWebPush(subscription: any, env: Bindings) {
+  const endpoint = new URL(subscription.endpoint);
+  
+  const header = { typ: 'JWT', alg: 'ES256' };
+  const encodedHeader = b64url(new TextEncoder().encode(JSON.stringify(header)));
+  
+  const jwtPayload = {
+    aud: `${endpoint.protocol}//${endpoint.host}`,
+    exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+    sub: 'mailto:admin@ebbinghaus.lab'
+  };
+  const encodedPayload = b64url(new TextEncoder().encode(JSON.stringify(jwtPayload)));
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+  
+  try {
+    const privateKeyJwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+    const key = await crypto.subtle.importKey(
+      'jwk',
+      privateKeyJwk,
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      false,
+      ['sign']
+    );
+    
+    const signature = await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      key,
+      new TextEncoder().encode(unsignedToken)
+    );
+    
+    const encodedSignature = b64url(signature);
+    const jwt = `${unsignedToken}.${encodedSignature}`;
+    
+    const headers = {
+      'Authorization': `vapid t=${jwt}, k=${env.VAPID_PUBLIC_KEY}`,
+      'TTL': '60'
+    };
+    
+    const res = await fetch(subscription.endpoint, { method: 'POST', headers });
+    if (!res.ok) {
+      if (res.status === 410 || res.status === 404) {
+        // Subscription expired or invalid, delete it
+        await env.DB.prepare('DELETE FROM subscriptions WHERE endpoint = ?').bind(subscription.endpoint).run();
+      }
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Push error:', err);
+    return false;
+  }
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled: async (event: any, env: Bindings, ctx: any) => {
+    ctx.waitUntil((async () => {
+      const today = formatDate(new Date());
+      const { results: dueItems } = await env.DB.prepare(
+        'SELECT DISTINCT user_id FROM items WHERE is_completed = 0 AND next_review_due <= ?'
+      ).bind(today).all();
+      
+      if (!dueItems || dueItems.length === 0) return;
+      
+      const dueUserIds = dueItems.map(item => (item as any).user_id);
+      const placeholders = dueUserIds.map(() => '?').join(',');
+      const { results: subscriptions } = await env.DB.prepare(
+        `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
+      ).bind(...dueUserIds).all();
+      
+      if (!subscriptions) return;
+      
+      for (const sub of subscriptions) {
+        await sendWebPush(sub, env);
+      }
+    })());
+  }
+};
