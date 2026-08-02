@@ -8,4 +8,4 @@ bucket = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "ebbinghaus-db"
-database_id = "ebbinghaus-d1-local-id"
+database_id = "bb23a795-14fc-4f3b-ac3b-80df3ec58169"
