@@ -462,6 +462,7 @@
       document.getElementById('main-header').style.display = 'block';
       document.getElementById('mobile-nav').style.display = 'flex';
       document.getElementById('view-auth').classList.add('hidden');
+      currentView = ''; // Reset so switchView doesn't return early
       switchView('dashboard');
     }
 
