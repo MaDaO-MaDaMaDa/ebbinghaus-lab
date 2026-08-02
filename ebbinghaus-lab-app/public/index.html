@@ -429,8 +429,11 @@
         const res = await fetch('/api/auth/me', {
           headers: { 'Authorization': 'Bearer ' + userToken }
         });
-        if (!res.ok) throw new Error('Token invalid');
         const data = await safeParseJson(res);
+        if (!res.ok) {
+          console.error('Auth verification failed:', data.error);
+          throw new Error('Token invalid');
+        }
         currentUser = data.user;
         
         document.getElementById('header-username').innerText = currentUser.username;
