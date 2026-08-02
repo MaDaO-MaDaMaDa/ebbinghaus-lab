@@ -382,9 +382,21 @@
 
     function registerServiceWorker() {
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-          .then(() => console.log('[PWA] ServiceWorker registered'))
-          .catch((err) => console.log('[PWA] ServiceWorker error:', err));
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          let hasUnregistered = false;
+          for(let registration of registrations) {
+            registration.unregister();
+            hasUnregistered = true;
+          }
+          if (hasUnregistered) {
+            console.log('[PWA] Cleared old service workers. Reloading...');
+            window.location.reload(true);
+          } else {
+            navigator.serviceWorker.register('/sw.js')
+              .then(() => console.log('[PWA] ServiceWorker registered'))
+              .catch((err) => console.log('[PWA] ServiceWorker error:', err));
+          }
+        });
       }
     }
 
