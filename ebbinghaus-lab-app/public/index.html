@@ -234,10 +234,10 @@
     </section>
 
     <!-- ==================== 01. DASHBOARD VIEW ==================== -->
-    <section id="view-dashboard" class="hidden flex-col h-full gap-3 md:gap-4 overflow-hidden">
+    <section id="view-dashboard" class="hidden flex-col h-full gap-4 md:gap-6 overflow-hidden">
 
       <!-- Animated Forgetting Curve -->
-      <div onclick="showEbbinghausExplanation()" class="lab-panel p-3 md:p-5 rounded relative border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-1 flex flex-col min-h-0">
+      <div onclick="showEbbinghausExplanation()" class="lab-panel p-3 md:p-5 rounded relative border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-1 flex flex-col min-h-0 mb-2">
         <div class="w-full flex-1 relative flex items-center justify-center">
           <svg id="ebbinghaus-svg" viewBox="-20 0 820 400" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
             <defs>
@@ -390,36 +390,47 @@
       </div>
 
       <!-- Top Metrics Banner -->
-      <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 shrink-0">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 shrink-0">
 
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">REVIEWS_DUE</div>
-          <div class="text-2xl font-bold text-lab-yellow mt-1 font-mono-lab" id="metric-due-count">0</div>
-          <div class="text-[9px] text-lab-muted mt-1 font-bold truncate">本日復習すべき項目</div>
-          <div class="absolute top-1 right-2 text-lab-yellow/20 text-3xl font-bold font-mono-lab">01</div>
-        </div>
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
-          <div class="text-2xl font-bold text-lab-cyan mt-1 font-mono-lab" id="metric-active-count">0</div>
-          <div class="text-[9px] text-lab-muted mt-1 font-bold truncate">学習進行中</div>
-          <div class="absolute top-1 right-2 text-lab-cyan/20 text-3xl font-bold font-mono-lab">02</div>
-        </div>
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">COMPLETED</div>
-          <div class="text-2xl font-bold text-lab-green mt-1 font-mono-lab" id="metric-completed-count">0</div>
-          <div class="text-[9px] text-lab-muted mt-1 font-bold truncate">目標達成済み</div>
-          <div class="absolute top-1 right-2 text-lab-green/20 text-3xl font-bold font-mono-lab">03</div>
-        </div>
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">AVG_STRENGTH</div>
-          <div class="text-2xl font-bold text-white mt-1 font-mono-lab" id="metric-avg-strength">0.0%</div>
-          <div class="w-full bg-lab-border rounded-full h-1.5 mt-1 overflow-hidden">
-            <div id="metric-strength-bar" class="bg-white h-full w-0 transition-all duration-500"></div>
+        <div class="lab-panel p-2 md:p-3 rounded relative overflow-hidden flex md:flex-col items-center justify-between md:items-start">
+          <div class="flex flex-col">
+            <div class="text-[9px] md:text-[10px] text-lab-muted font-bold font-mono-lab">REVIEWS_DUE</div>
+            <div class="text-[8px] md:text-[9px] text-lab-muted mt-0.5 md:mt-1 font-bold truncate">本日復習すべき項目</div>
           </div>
-          <div class="absolute top-1 right-2 text-white/10 text-3xl font-bold font-mono-lab">04</div>
+          <div class="text-xl md:text-2xl font-bold text-lab-yellow font-mono-lab z-10" id="metric-due-count">0</div>
+          <div class="absolute top-1/2 -translate-y-1/2 md:top-1 md:translate-y-0 right-2 text-lab-yellow/10 text-3xl font-bold font-mono-lab">01</div>
+        </div>
+
+        <div class="lab-panel p-2 md:p-3 rounded relative overflow-hidden flex md:flex-col items-center justify-between md:items-start">
+          <div class="flex flex-col">
+            <div class="text-[9px] md:text-[10px] text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
+            <div class="text-[8px] md:text-[9px] text-lab-muted mt-0.5 md:mt-1 font-bold truncate">学習進行中</div>
+          </div>
+          <div class="text-xl md:text-2xl font-bold text-lab-cyan font-mono-lab z-10" id="metric-active-count">0</div>
+          <div class="absolute top-1/2 -translate-y-1/2 md:top-1 md:translate-y-0 right-2 text-lab-cyan/10 text-3xl font-bold font-mono-lab">02</div>
+        </div>
+
+        <div class="lab-panel p-2 md:p-3 rounded relative overflow-hidden flex md:flex-col items-center justify-between md:items-start">
+          <div class="flex flex-col">
+            <div class="text-[9px] md:text-[10px] text-lab-muted font-bold font-mono-lab">COMPLETED</div>
+            <div class="text-[8px] md:text-[9px] text-lab-muted mt-0.5 md:mt-1 font-bold truncate">目標達成済み</div>
+          </div>
+          <div class="text-xl md:text-2xl font-bold text-lab-green font-mono-lab z-10" id="metric-completed-count">0</div>
+          <div class="absolute top-1/2 -translate-y-1/2 md:top-1 md:translate-y-0 right-2 text-lab-green/10 text-3xl font-bold font-mono-lab">03</div>
+        </div>
+
+        <div class="lab-panel p-2 md:p-3 rounded relative overflow-hidden flex md:flex-col items-center justify-between md:items-start">
+          <div class="flex flex-col flex-1 w-full pr-8 md:pr-0">
+            <div class="text-[9px] md:text-[10px] text-lab-muted font-bold font-mono-lab flex justify-between">
+              <span>AVG_STRENGTH</span>
+              <span class="text-white font-bold md:hidden" id="metric-avg-strength-mob">0.0%</span>
+            </div>
+            <div class="hidden md:block text-2xl font-bold text-white mt-1 font-mono-lab" id="metric-avg-strength">0.0%</div>
+            <div class="w-full bg-lab-border rounded-full h-1 md:h-1.5 mt-1 overflow-hidden">
+              <div id="metric-strength-bar" class="bg-white h-full w-0 transition-all duration-500"></div>
+            </div>
+          </div>
+          <div class="absolute top-1/2 -translate-y-1/2 md:top-1 md:translate-y-0 right-2 text-white/5 text-3xl font-bold font-mono-lab">04</div>
         </div>
       </div>
 
@@ -942,6 +953,9 @@
       }
 
       document.getElementById('metric-avg-strength').innerText = avgStrength + '%';
+      if (document.getElementById('metric-avg-strength-mob')) {
+        document.getElementById('metric-avg-strength-mob').innerText = avgStrength + '%';
+      }
       document.getElementById('metric-strength-bar').style.width = avgStrength + '%';
     }
 
