@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ebbinghaus-v3';
+const CACHE_NAME = 'ebbinghaus-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
