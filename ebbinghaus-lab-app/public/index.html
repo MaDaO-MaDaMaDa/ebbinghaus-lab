@@ -123,7 +123,7 @@
   </style>
 </head>
 
-<body class="h-full flex flex-col antialiased selection:bg-lab-cyan selection:text-black">
+<body class="h-full flex flex-col antialiased selection:bg-lab-cyan selection:text-black overflow-hidden overscroll-none">
   <div class="scanline"></div>
 
   <!-- HEADER -->
@@ -166,7 +166,7 @@
   </header>
 
   <!-- MAIN CONTENT AREA -->
-  <main class="flex flex-col flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 pb-28 md:pb-8 relative z-0">
+  <main class="flex flex-col flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 pb-28 md:pb-8 relative z-0 overflow-y-auto">
 
     <!-- SYSTEM LOG FEEDBACK TOAST -->
     <div id="sys-toast"
@@ -237,9 +237,9 @@
     <section id="view-dashboard" class="hidden flex-col h-full gap-6">
 
       <!-- Animated Forgetting Curve -->
-      <div onclick="showEbbinghausExplanation()" class="lab-panel p-5 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer">
-        <div class="w-full overflow-hidden relative flex items-center justify-center">
-          <svg id="ebbinghaus-svg" viewBox="30 10 740 200" class="w-full h-auto drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
+      <div onclick="showEbbinghausExplanation()" class="lab-panel p-5 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer min-h-[400px] flex flex-col">
+        <div class="w-full flex-1 overflow-hidden relative flex items-center justify-center">
+          <svg id="ebbinghaus-svg" viewBox="-20 0 820 260" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="curveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#EF4444" />
@@ -329,8 +329,9 @@
             <!-- Grid lines & Axes -->
             <g stroke="#1E293B" stroke-width="1" stroke-dasharray="4 4">
               <line x1="50" y1="20" x2="750" y2="20" />
-              <line x1="50" y1="80" x2="750" y2="80" />
-              <line x1="50" y1="140" x2="750" y2="140" />
+              <line x1="50" y1="65" x2="750" y2="65" />
+              <line x1="50" y1="110" x2="750" y2="110" />
+              <line x1="50" y1="155" x2="750" y2="155" />
               <line x1="50" y1="200" x2="750" y2="200" />
             </g>
             <g stroke="#334155" stroke-width="2">
@@ -338,7 +339,24 @@
               <line x1="50" y1="200" x2="750" y2="200" />
             </g>
 
-            <!-- Labels Removed as requested -->            <!-- Curve 1 (Initial Learning) -->
+            <!-- Axes Labels -->
+            <g fill="#64748B" font-size="12" class="font-mono-lab">
+              <!-- Y Axis (Retention) -->
+              <text x="40" y="24" text-anchor="end">100%</text>
+              <text x="40" y="69" text-anchor="end">75%</text>
+              <text x="40" y="114" text-anchor="end">50%</text>
+              <text x="40" y="159" text-anchor="end">25%</text>
+              <text x="40" y="204" text-anchor="end">0%</text>
+              
+              <!-- X Axis (Time) -->
+              <text x="50" y="225" text-anchor="middle">Day 0</text>
+              <text x="250" y="225" text-anchor="middle">Day 1</text>
+              <text x="450" y="225" text-anchor="middle">Day 2</text>
+              <text x="650" y="225" text-anchor="middle">Day 3+</text>
+            </g>
+            <text x="400" y="250" fill="#E2E8F0" font-size="14" font-weight="bold" text-anchor="middle">Time (Days)</text>
+            <text x="0" y="110" fill="#E2E8F0" font-size="14" font-weight="bold" text-anchor="middle" transform="rotate(-90 0 110)">Retention (%)</text>
+            <!-- Curve 1 (Initial Learning) -->
             <path class="draw-line" d="M 50 20 Q 150 150 250 170" fill="none" stroke="url(#curveGrad1)" stroke-width="4"
               stroke-linecap="round" />
 
@@ -906,7 +924,7 @@
           '<div class="col-span-full lab-panel p-8 text-center rounded space-y-4">' +
           '<div class="text-lab-green font-bold text-lg font-mono-lab">[NO_ACTIVE_TASKS]</div>' +
           '<p class="text-sm font-semibold text-lab-muted">学習進行中のタスクが1つも登録されていません。<br>新しいタスクを登録して、学習を開始しましょう！</p>' +
-          '<button onclick="toggleAddItemForm()" class="bg-lab-cyan/20 border border-lab-cyan text-lab-cyan px-4 py-3 rounded text-sm font-bold hover:bg-lab-cyan hover:text-black transition">' +
+          '<button onclick="switchView(\\\'history\\\'); setTimeout(() => toggleAddItemForm(true), 100);" class="bg-lab-cyan/20 border border-lab-cyan text-lab-cyan px-4 py-3 rounded text-sm font-bold hover:bg-lab-cyan hover:text-black transition">' +
           '新しい記録を追加する' +
           '</button>' +
           '</div>';
