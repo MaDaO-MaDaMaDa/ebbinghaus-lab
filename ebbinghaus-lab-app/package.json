@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "wrangler pages dev public",
-    "deploy": "wrangler deploy --minify",
+    "deploy": "wrangler pages deploy public --project-name ebbinghaus-lab",
     "secret:pub": "wrangler secret put VAPID_PUBLIC_KEY",
     "secret:priv": "wrangler secret put VAPID_PRIVATE_JWK"
   },
