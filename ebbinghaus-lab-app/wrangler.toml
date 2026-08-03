@@ -1,9 +1,15 @@
 name = "ebbinghaus-lab-app"
-pages_build_output_dir = "./public"
+main = "src/index.ts"
 compatibility_date = "2024-03-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "ebbinghaus-db"
 database_id = "bb23a795-14fc-4f3b-ac3b-80df3ec58169"
 
+[triggers]
+crons = ["*/15 * * * *"]
