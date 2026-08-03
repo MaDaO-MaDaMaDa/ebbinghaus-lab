@@ -302,9 +302,18 @@ app.get('/api/notifications/vapid-key', async (c) => {
 
 app.get('/api/notifications/status', async (c) => {
   checkDbBinding(c);
-  const payload = c.get('jwtPayload') as any;
-  if (!payload || !payload.id) return c.json({ error: 'Unauthorized' }, 401);
-  const userId = payload.id as string;
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const token = authHeader.split(' ')[1];
+  let userId;
+  try {
+    const payload = await verify(token, getJwtSecret(c), 'HS256');
+    userId = payload.id as string;
+  } catch (e) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
   const countObj = await c.env.DB.prepare('SELECT COUNT(*) as count FROM subscriptions WHERE user_id = ?').bind(userId).first<{ count: number }>();
   return c.json({ subscribed: countObj && countObj.count > 0 });
 });
