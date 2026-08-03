@@ -51,17 +51,25 @@ function addDays(baseDateStr: string, days: number): string {
   return formatDate(d);
 }
 
-const LEARN_INTERVAL_STEPS = [1, 3, 7, 14, 30];
-function getNextLearnInterval(current: number): number {
-  const idx = LEARN_INTERVAL_STEPS.indexOf(current);
-  if (idx === -1) {
-    for (const step of LEARN_INTERVAL_STEPS) {
-      if (step > current) return step;
-    }
-    return 30;
-  }
-  if (idx < LEARN_INTERVAL_STEPS.length - 1) return LEARN_INTERVAL_STEPS[idx + 1];
-  return 30;
+function calculateDynamicInterval(lastReviewedAt: string | null, createdAt: string, currentInterval: number, todayStr: string): number {
+  const baseDateStr = lastReviewedAt || createdAt.split(' ')[0]; // Handle datetime string
+  const baseDate = new Date(baseDateStr);
+  const today = new Date(todayStr);
+  
+  const elapsedMs = today.getTime() - baseDate.getTime();
+  const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+
+  const ef = 2.0; // Ease Factor
+  // Base interval for calculation is the actual elapsed days, but at least the current expected interval
+  const baseInterval = Math.max(currentInterval, elapsedDays, 1);
+  
+  let nextInterval = Math.round(baseInterval * ef);
+  
+  // Cap at 1 year max, 1 day min
+  if (nextInterval > 365) nextInterval = 365;
+  if (nextInterval < 1) nextInterval = 1;
+
+  return nextInterval;
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -226,21 +234,29 @@ app.get('/api/items', async (c) => {
 app.post('/api/items', async (c) => {
   const userId = c.get('userId');
   try {
-    const body = await c.req.json<{ topic?: string; memo?: string; target_mastery?: number }>();
+    const body = await c.req.json<{ topic?: string; memo?: string }>();
     if (!body.topic) return c.json({ error: 'topic is required' }, 400);
+
+    const topicTrimmed = body.topic.trim();
+
+    // Check for duplicates
+    const existing = await c.env.DB.prepare('SELECT id FROM items WHERE user_id = ? AND topic = ?').bind(userId, topicTrimmed).first();
+    if (existing) {
+      return c.json({ error: 'その学習内容は既に登録されています' }, 409);
+    }
 
     const id = crypto.randomUUID();
     const today = formatDate(new Date());
     const initialMemoryStrength = 0.2;
     const initialInterval = 1;
     const nextReviewDue = today;
-    const targetMastery = body.target_mastery || 1.0;
+    const targetMastery = 1.0; // Force 100%
 
     await c.env.DB.prepare(
       `INSERT INTO items (id, user_id, topic, memo, target_mastery, memory_strength, interval_days, is_completed, last_reviewed_at, next_review_due)
        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
     ).bind(
-      id, userId, body.topic.trim(), body.memo ? body.memo.trim() : null,
+      id, userId, topicTrimmed, body.memo ? body.memo.trim() : null,
       targetMastery, initialMemoryStrength, initialInterval, null, nextReviewDue
     ).run();
 
@@ -260,7 +276,7 @@ app.put('/api/items/:id/review', async (c) => {
 
     const today = formatDate(new Date());
     let newMemoryStrength = Math.min(1.0, Math.round((item.memory_strength + 0.20) * 100) / 100);
-    let newInterval = getNextLearnInterval(item.interval_days);
+    let newInterval = calculateDynamicInterval(item.last_reviewed_at, item.created_at, item.interval_days, today);
     let isCompleted = newMemoryStrength >= item.target_mastery ? 1 : 0;
     const nextReviewDue = isCompleted ? null : addDays(today, newInterval);
 
