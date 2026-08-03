@@ -17,9 +17,11 @@ type Item = {
   target_mastery: number;
   memory_strength: number;
   interval_days: number;
+  review_step: number;
   is_completed: number;
   last_reviewed_at: string | null;
   next_review_due: string | null;
+  last_notified_at: string | null;
   created_at: string;
 };
 
@@ -44,39 +46,24 @@ app.onError((err, c) => {
   return c.json({ error: err.message || 'Internal Server Error' }, 500);
 });
 
-// Helper: Format Date to YYYY-MM-DD
-function formatDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+// Helper: Format Date to YYYY-MM-DD HH:MM:SS
+function formatDateTime(d: Date): string {
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const hours = String(d.getUTCHours()).padStart(2, '0');
+  const mins = String(d.getUTCMinutes()).padStart(2, '0');
+  const secs = String(d.getUTCSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${mins}:${secs}`;
 }
 
-function addDays(baseDateStr: string, days: number): string {
-  const d = new Date(baseDateStr);
-  d.setDate(d.getDate() + days);
-  return formatDate(d);
-}
+const EBBINGHAUS_INTERVALS_HOURS = [1, 9, 24, 48, 144, 744];
 
-function calculateDynamicInterval(lastReviewedAt: string | null, createdAt: string, currentInterval: number, todayStr: string): number {
-  const baseDateStr = lastReviewedAt || createdAt.split(' ')[0]; // Handle datetime string
-  const baseDate = new Date(baseDateStr);
-  const today = new Date(todayStr);
-  
-  const elapsedMs = today.getTime() - baseDate.getTime();
-  const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
-
-  const ef = 2.0; // Ease Factor
-  // Base interval for calculation is the actual elapsed days, but at least the current expected interval
-  const baseInterval = Math.max(currentInterval, elapsedDays, 1);
-  
-  let nextInterval = Math.round(baseInterval * ef);
-  
-  // Cap at 1 year max, 1 day min
-  if (nextInterval > 365) nextInterval = 365;
-  if (nextInterval < 1) nextInterval = 1;
-
-  return nextInterval;
+function getNextReviewTimestamp(step: number): string {
+  const hours = EBBINGHAUS_INTERVALS_HOURS[step] || 744;
+  const d = new Date();
+  d.setUTCHours(d.getUTCHours() + hours);
+  return formatDateTime(d);
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -219,7 +206,7 @@ app.use('/api/items/*', async (c, next) => {
 
 app.get('/api/items', async (c) => {
   const dueOnly = c.req.query('due') === 'true';
-  const today = formatDate(new Date());
+  const now = formatDateTime(new Date());
   const userId = c.get('userId');
 
   try {
@@ -228,11 +215,11 @@ app.get('/api/items', async (c) => {
 
     if (dueOnly) {
       query = 'SELECT * FROM items WHERE user_id = ? AND is_completed = 0 AND (next_review_due IS NULL OR next_review_due <= ?) ORDER BY next_review_due ASC';
-      params = [userId, today];
+      params = [userId, now];
     }
 
     const { results } = await c.env.DB.prepare(query).bind(...params).all<Item>();
-    return c.json({ items: results || [], today });
+    return c.json({ items: results || [], today: now });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -253,18 +240,18 @@ app.post('/api/items', async (c) => {
     }
 
     const id = crypto.randomUUID();
-    const today = formatDate(new Date());
     const initialMemoryStrength = 0.2;
     const initialInterval = 1;
-    const nextReviewDue = today;
+    const reviewStep = 0;
+    const nextReviewDue = getNextReviewTimestamp(reviewStep);
     const targetMastery = 1.0; // Force 100%
 
     await c.env.DB.prepare(
-      `INSERT INTO items (id, user_id, topic, memo, target_mastery, memory_strength, interval_days, is_completed, last_reviewed_at, next_review_due)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+      `INSERT INTO items (id, user_id, topic, memo, target_mastery, memory_strength, interval_days, review_step, is_completed, last_reviewed_at, next_review_due, last_notified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL)`
     ).bind(
       id, userId, topicTrimmed, body.memo ? body.memo.trim() : null,
-      targetMastery, initialMemoryStrength, initialInterval, null, nextReviewDue
+      targetMastery, initialMemoryStrength, initialInterval, reviewStep, null, nextReviewDue
     ).run();
 
     const newItem = await c.env.DB.prepare('SELECT * FROM items WHERE id = ?').bind(id).first<Item>();
@@ -281,15 +268,15 @@ app.put('/api/items/:id/review', async (c) => {
     const item = await c.env.DB.prepare('SELECT * FROM items WHERE id = ? AND user_id = ?').bind(id, userId).first<Item>();
     if (!item) return c.json({ error: 'Item not found' }, 404);
 
-    const today = formatDate(new Date());
+    const now = formatDateTime(new Date());
     let newMemoryStrength = Math.min(1.0, Math.round((item.memory_strength + 0.20) * 100) / 100);
-    let newInterval = calculateDynamicInterval(item.last_reviewed_at, item.created_at, item.interval_days, today);
+    let nextStep = (item.review_step ?? 0) + 1;
     let isCompleted = newMemoryStrength >= item.target_mastery ? 1 : 0;
-    const nextReviewDue = isCompleted ? null : addDays(today, newInterval);
+    const nextReviewDue = isCompleted ? null : getNextReviewTimestamp(nextStep);
 
     await c.env.DB.prepare(
-      `UPDATE items SET memory_strength = ?, interval_days = ?, is_completed = ?, last_reviewed_at = ?, next_review_due = ? WHERE id = ?`
-    ).bind(newMemoryStrength, newInterval, isCompleted, today, nextReviewDue, id).run();
+      `UPDATE items SET memory_strength = ?, interval_days = ?, review_step = ?, is_completed = ?, last_reviewed_at = ?, next_review_due = ? WHERE id = ?`
+    ).bind(newMemoryStrength, EBBINGHAUS_INTERVALS_HOURS[nextStep] || 744, nextStep, isCompleted, now, nextReviewDue, id).run();
 
     const updatedItem = await c.env.DB.prepare('SELECT * FROM items WHERE id = ?').bind(id).first<Item>();
     return c.json({ item: updatedItem });
@@ -416,10 +403,10 @@ async function sendWebPush(subscription: any, env: Bindings) {
 }
 
 async function triggerCron(env: Bindings) {
-  const today = formatDate(new Date());
+  const now = formatDateTime(new Date());
   const { results: dueItems } = await env.DB.prepare(
-    'SELECT DISTINCT user_id FROM items WHERE is_completed = 0 AND next_review_due <= ?'
-  ).bind(today).all();
+    'SELECT DISTINCT user_id FROM items WHERE is_completed = 0 AND next_review_due <= ? AND (last_notified_at IS NULL OR last_notified_at < next_review_due)'
+  ).bind(now).all();
   
   if (!dueItems || dueItems.length === 0) return;
   
@@ -434,6 +421,11 @@ async function triggerCron(env: Bindings) {
   for (const sub of subscriptions) {
     await sendWebPush(sub, env);
   }
+
+  // Update last_notified_at for the due items so we don't notify again until their next review
+  await env.DB.prepare(
+    'UPDATE items SET last_notified_at = ? WHERE is_completed = 0 AND next_review_due <= ? AND (last_notified_at IS NULL OR last_notified_at < next_review_due)'
+  ).bind(now, now).run();
 }
 
 app.get('/api/cron/trigger', async (c) => {

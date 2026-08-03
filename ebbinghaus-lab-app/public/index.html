@@ -731,6 +731,19 @@
       }
     }
 
+    function formatDisplayDate(dateStr) {
+      if (!dateStr) return 'N/A';
+      try {
+        const parts = dateStr.split(' ');
+        if (parts.length === 2) {
+          const dp = parts[0].split('-');
+          const tp = parts[1].split(':');
+          return dp[1] + '/' + dp[2] + ' ' + tp[0] + ':' + tp[1];
+        }
+        return dateStr;
+      } catch (e) { return dateStr; }
+    }
+
     async function checkAuthStatus() {
       if (!userToken) {
         showAuthScreen();
@@ -892,7 +905,7 @@
         const data = await safeParseJson(res);
         itemsState = data.items || [];
 
-        const todayStr = data.today || new Date().toISOString().split('T')[0];
+        const todayStr = data.today || new Date().toISOString().replace('T', ' ').substring(0, 19);
         const activeItems = itemsState.filter(item => item.is_completed === 0);
         dueItemsState = activeItems.filter(item => !item.next_review_due || item.next_review_due <= todayStr);
 
@@ -963,7 +976,7 @@
         return;
       }
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
       container.innerHTML = dueItemsState.map(function (item) {
         const currentPct = Math.round((item.memory_strength || 0) * 100);
@@ -977,7 +990,7 @@
           '<div class="lab-panel p-6 rounded space-y-5 flex flex-col justify-between relative overflow-hidden ' + glowClass + '">' +
           '<div>' +
           '<div class="flex justify-between items-center text-xs text-lab-muted border-b border-lab-border pb-3 font-mono-lab font-bold">' +
-          '<span>INTERVAL: ' + item.interval_days + 'd</span>' +
+          '<span>INTERVAL: ' + item.interval_days + 'h</span>' +
           '<span>MEM: <span class="text-white">' + currentPct + '%</span> / TGT: <span class="text-lab-cyan">' + targetPct + '%</span></span>' +
           '</div>' +
           '<div class="mt-4">' +
@@ -1013,7 +1026,7 @@
         const data = await safeParseJson(res);
 
         if (data.item.is_completed === 1) showToast('達成完了: 目標習得率をクリアしました！');
-        else showToast('復習完了: 次回の復習日は ' + data.item.next_review_due + ' です');
+        else showToast('復習完了: 次回の復習は ' + formatDisplayDate(data.item.next_review_due) + ' です');
 
         fetchItems();
       } catch (err) {
@@ -1061,7 +1074,7 @@
           '</div>' +
           '</div>' +
           '</td>' +
-          '<td class="p-3 font-mono-lab text-xs font-bold ' + (isCompleted ? 'text-lab-muted' : 'text-lab-yellow') + '">' + (item.next_review_due || 'N/A') + '</td>' +
+          '<td class="p-3 font-mono-lab text-xs font-bold ' + (isCompleted ? 'text-lab-muted' : 'text-lab-yellow') + '">' + formatDisplayDate(item.next_review_due) + '</td>' +
           '<td class="p-3 text-right">' +
           '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red hover:underline text-xs font-bold py-1 px-2">DEL</button>' +
           '</td>' +
@@ -1069,8 +1082,17 @@
         );
       }).join('');
 
+      const todayStr = new Date().toISOString().substring(0, 10);
       mobileList.innerHTML = itemsState.map(rowMapper).map(function (obj) {
         const { item, currentPct, targetPct, isCompleted, statusBadge } = obj;
+        let statusHtml = '';
+        if (item.next_review_due && item.next_review_due.substring(0, 10) < todayStr) {
+          statusHtml = '<span class="text-lab-red text-xs font-bold font-mono-lab">OVERDUE</span>';
+        } else if (isCompleted) {
+          statusHtml = '<span class="text-lab-muted text-xs font-bold font-mono-lab">DONE</span>';
+        } else {
+          statusHtml = '<span class="text-lab-yellow text-xs font-bold font-mono-lab">DUE: ' + formatDisplayDate(item.next_review_due) + '</span>';
+        }
         return (
           '<div class="p-5 flex flex-col gap-3 hover:bg-lab-panel/50 transition ' + (isCompleted ? 'opacity-70' : '') + '">' +
           '<div class="flex justify-between items-start gap-2">' +
@@ -1086,8 +1108,8 @@
           '<span class="text-sm font-bold font-mono-lab text-white">' + currentPct + '% <span class="text-xs text-lab-muted">/ ' + targetPct + '%</span></span>' +
           '</div>' +
           '<div class="flex flex-col gap-1 text-right">' +
-          '<span class="text-[10px] text-lab-muted font-bold font-mono-lab">NEXT DUE</span>' +
-          '<span class="text-sm font-bold font-mono-lab ' + (isCompleted ? 'text-lab-muted' : 'text-lab-yellow') + '">' + (item.next_review_due || 'N/A') + '</span>' +
+          '<span class="text-[10px] text-lab-muted font-bold font-mono-lab">STATUS</span>' +
+          statusHtml +
           '</div>' +
           '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red bg-lab-red/10 border border-lab-red/50 hover:bg-lab-red hover:text-white rounded font-bold px-3 py-2 transition text-xs ml-2">削除</button>' +
           '</div>' +

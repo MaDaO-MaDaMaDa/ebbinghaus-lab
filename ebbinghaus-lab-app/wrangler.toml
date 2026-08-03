@@ -7,5 +7,3 @@ binding = "DB"
 database_name = "ebbinghaus-db"
 database_id = "ebbinghaus-d1-local-id"
 
-[triggers]
-crons = ["0 0 * * *"]
