@@ -7,3 +7,5 @@ binding = "DB"
 database_name = "ebbinghaus-db"
 database_id = "bb23a795-14fc-4f3b-ac3b-80df3ec58169"
 
+[triggers]
+crons = ["*/15 * * * *"]
