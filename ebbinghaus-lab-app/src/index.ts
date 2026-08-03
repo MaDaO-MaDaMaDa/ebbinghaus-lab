@@ -300,6 +300,15 @@ app.get('/api/notifications/vapid-key', async (c) => {
   return c.json({ publicKey: c.env.VAPID_PUBLIC_KEY });
 });
 
+app.get('/api/notifications/status', async (c) => {
+  checkDbBinding(c);
+  const payload = c.get('jwtPayload') as any;
+  if (!payload || !payload.id) return c.json({ error: 'Unauthorized' }, 401);
+  const userId = payload.id as string;
+  const countObj = await c.env.DB.prepare('SELECT COUNT(*) as count FROM subscriptions WHERE user_id = ?').bind(userId).first<{ count: number }>();
+  return c.json({ subscribed: countObj && countObj.count > 0 });
+});
+
 app.post('/api/notifications/subscribe', async (c) => {
   checkDbBinding(c);
   const authHeader = c.req.header('Authorization');
