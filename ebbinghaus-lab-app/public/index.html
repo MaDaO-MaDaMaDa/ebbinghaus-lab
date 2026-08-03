@@ -237,7 +237,7 @@
     <section id="view-dashboard" class="hidden flex-col h-full gap-6">
 
       <!-- Animated Forgetting Curve -->
-      <div onclick="showEbbinghausExplanation()" class="lab-panel p-5 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer min-h-[400px] flex flex-col">
+      <div onclick="showEbbinghausExplanation()" class="lab-panel p-5 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer min-h-[500px] md:min-h-[450px] flex flex-col">
         <div class="w-full flex-1 overflow-hidden relative flex items-center justify-center">
           <svg id="ebbinghaus-svg" viewBox="-20 0 820 260" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
             <defs>
@@ -389,7 +389,7 @@
       </div>
 
       <!-- Top Metrics Banner -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
 
         <div class="lab-panel p-4 rounded relative overflow-hidden">
           <div class="text-xs text-lab-muted font-bold font-mono-lab">REVIEWS_DUE_TODAY</div>
@@ -658,6 +658,18 @@
 
   <!-- SCRIPT LOGIC -->
   <script>
+    // Intercept fetch to support VS Code Live Server (port 5501/5500)
+    const originalFetch = window.fetch;
+    window.fetch = function() {
+      let args = Array.prototype.slice.call(arguments);
+      if (typeof args[0] === 'string' && args[0].startsWith('/api/')) {
+        const isLiveServer = window.location.port === '5501' || window.location.port === '5500';
+        const baseUrl = isLiveServer ? 'http://127.0.0.1:8787' : '';
+        args[0] = baseUrl + args[0];
+      }
+      return originalFetch.apply(this, args);
+    };
+
     let itemsState = [];
     let dueItemsState = [];
     let currentView = 'auth';
@@ -684,7 +696,15 @@
             window.location.reload(true);
           } else {
             navigator.serviceWorker.register('/sw.js')
-              .then(() => console.log('[PWA] ServiceWorker registered'))
+              .then((reg) => {
+                console.log('[PWA] ServiceWorker registered');
+                // Restore notification toggle state
+                return reg.pushManager.getSubscription();
+              })
+              .then((sub) => {
+                const toggle = document.getElementById('notification-toggle');
+                if (toggle) toggle.checked = !!sub;
+              })
               .catch((err) => console.log('[PWA] ServiceWorker error:', err));
           }
         });
@@ -924,7 +944,7 @@
           '<div class="col-span-full lab-panel p-8 text-center rounded space-y-4">' +
           '<div class="text-lab-green font-bold text-lg font-mono-lab">[NO_ACTIVE_TASKS]</div>' +
           '<p class="text-sm font-semibold text-lab-muted">学習進行中のタスクが1つも登録されていません。<br>新しいタスクを登録して、学習を開始しましょう！</p>' +
-          '<button onclick="switchView(\\\'history\\\'); setTimeout(() => toggleAddItemForm(true), 100);" class="bg-lab-cyan/20 border border-lab-cyan text-lab-cyan px-4 py-3 rounded text-sm font-bold hover:bg-lab-cyan hover:text-black transition">' +
+          '<button onclick="switchView(\'history\'); setTimeout(() => toggleAddItemForm(true), 100);" class="bg-lab-cyan/20 border border-lab-cyan text-lab-cyan px-4 py-3 rounded text-sm font-bold hover:bg-lab-cyan hover:text-black transition">' +
           '新しい記録を追加する' +
           '</button>' +
           '</div>';

@@ -1,4 +1,4 @@
 import { handle } from 'hono/cloudflare-pages';
-import app from '../../src/index';
+import { honoApp } from '../../src/index';
 
-export const onRequest = handle(app);
+export const onRequest = handle(honoApp);

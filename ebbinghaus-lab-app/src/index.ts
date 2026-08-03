@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { sign, verify } from 'hono/jwt';
+import { cors } from 'hono/cors';
 
 type Bindings = {
   DB: D1Database;
@@ -30,6 +31,12 @@ type User = {
 };
 
 const app = new Hono<{ Bindings: Bindings, Variables: { userId: string } }>();
+
+app.use('/api/*', cors({
+  origin: '*',
+  allowMethods: ['POST', 'GET', 'OPTIONS', 'PUT', 'DELETE'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}));
 
 // Global Error Handler to guarantee JSON error response
 app.onError((err, c) => {
@@ -348,7 +355,7 @@ app.get('/api/notifications/pending', async (c) => {
 });
 
 // Helper for JWT encoding
-function b64url(buf: ArrayBuffer): string {
+function b64url(buf: ArrayBuffer | Uint8Array): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -433,6 +440,8 @@ app.get('/api/cron/trigger', async (c) => {
   await triggerCron(c.env);
   return c.json({ success: true, message: 'Cron logic triggered manually for testing.' });
 });
+
+export const honoApp = app;
 
 export default {
   fetch: app.fetch,
