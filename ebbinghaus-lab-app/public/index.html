@@ -234,12 +234,12 @@
     </section>
 
     <!-- ==================== 01. DASHBOARD VIEW ==================== -->
-    <section id="view-dashboard" class="hidden flex-col h-full gap-6">
+    <section id="view-dashboard" class="hidden flex-col h-full gap-3 md:gap-4 overflow-hidden">
 
       <!-- Animated Forgetting Curve -->
-      <div onclick="showEbbinghausExplanation()" class="lab-panel p-5 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer min-h-[500px] md:min-h-[450px] flex flex-col">
-        <div class="w-full flex-1 overflow-hidden relative flex items-center justify-center">
-          <svg id="ebbinghaus-svg" viewBox="-20 0 820 260" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
+      <div onclick="showEbbinghausExplanation()" class="lab-panel p-3 md:p-5 rounded relative border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-1 flex flex-col min-h-0">
+        <div class="w-full flex-1 relative flex items-center justify-center">
+          <svg id="ebbinghaus-svg" viewBox="-20 0 820 400" class="w-full h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="curveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#EF4444" />
@@ -329,59 +329,60 @@
             <!-- Grid lines & Axes -->
             <g stroke="#1E293B" stroke-width="1" stroke-dasharray="4 4">
               <line x1="50" y1="20" x2="750" y2="20" />
-              <line x1="50" y1="65" x2="750" y2="65" />
-              <line x1="50" y1="110" x2="750" y2="110" />
-              <line x1="50" y1="155" x2="750" y2="155" />
-              <line x1="50" y1="200" x2="750" y2="200" />
+              <line x1="50" y1="95" x2="750" y2="95" />
+              <line x1="50" y1="170" x2="750" y2="170" />
+              <line x1="50" y1="245" x2="750" y2="245" />
+              <line x1="50" y1="320" x2="750" y2="320" />
             </g>
             <g stroke="#334155" stroke-width="2">
-              <line x1="50" y1="20" x2="50" y2="200" />
-              <line x1="50" y1="200" x2="750" y2="200" />
+              <line x1="50" y1="20" x2="50" y2="320" />
+              <line x1="50" y1="320" x2="750" y2="320" />
             </g>
 
             <!-- Axes Labels -->
             <g fill="#64748B" font-size="12" class="font-mono-lab">
               <!-- Y Axis (Retention) -->
               <text x="40" y="24" text-anchor="end">100%</text>
-              <text x="40" y="69" text-anchor="end">75%</text>
-              <text x="40" y="114" text-anchor="end">50%</text>
-              <text x="40" y="159" text-anchor="end">25%</text>
-              <text x="40" y="204" text-anchor="end">0%</text>
+              <text x="40" y="99" text-anchor="end">75%</text>
+              <text x="40" y="174" text-anchor="end">50%</text>
+              <text x="40" y="249" text-anchor="end">25%</text>
+              <text x="40" y="324" text-anchor="end">0%</text>
               
               <!-- X Axis (Time) -->
-              <text x="50" y="225" text-anchor="middle">Day 0</text>
-              <text x="250" y="225" text-anchor="middle">Day 1</text>
-              <text x="450" y="225" text-anchor="middle">Day 2</text>
-              <text x="650" y="225" text-anchor="middle">Day 3+</text>
+              <text x="50" y="345" text-anchor="middle">Day 0</text>
+              <text x="250" y="345" text-anchor="middle">Day 1</text>
+              <text x="450" y="345" text-anchor="middle">Day 2</text>
+              <text x="650" y="345" text-anchor="middle">Day 3+</text>
             </g>
-            <text x="400" y="250" fill="#E2E8F0" font-size="14" font-weight="bold" text-anchor="middle">Time (Days)</text>
-            <text x="0" y="110" fill="#E2E8F0" font-size="14" font-weight="bold" text-anchor="middle" transform="rotate(-90 0 110)">Retention (%)</text>
+            <text x="400" y="380" fill="#E2E8F0" font-size="14" font-weight="bold" text-anchor="middle">Time (Days)</text>
+            <text x="0" y="170" fill="#E2E8F0" font-size="14" font-weight="bold" text-anchor="middle" transform="rotate(-90 0 170)">Retention (%)</text>
+            
             <!-- Curve 1 (Initial Learning) -->
-            <path class="draw-line" d="M 50 20 Q 150 150 250 170" fill="none" stroke="url(#curveGrad1)" stroke-width="4"
+            <path class="draw-line" d="M 50 20 Q 150 236 250 270" fill="none" stroke="url(#curveGrad1)" stroke-width="4"
               stroke-linecap="round" />
 
             <!-- Review 1 -->
-            <line class="fade-in delay-fade-1" x1="250" y1="170" x2="250" y2="20" stroke="#10B981" stroke-width="2"
+            <line class="fade-in delay-fade-1" x1="250" y1="270" x2="250" y2="20" stroke="#10B981" stroke-width="2"
               stroke-dasharray="4" />
             <circle class="fade-in delay-fade-1 dot-animate" cx="250" cy="20" r="5" fill="#10B981"
               style="transform-origin: 250px 20px" />
-            <path class="draw-line delay-1" d="M 250 20 Q 350 120 450 140" fill="none" stroke="url(#curveGrad2)"
+            <path class="draw-line delay-1" d="M 250 20 Q 350 186 450 220" fill="none" stroke="url(#curveGrad2)"
               stroke-width="4" stroke-linecap="round" />
 
             <!-- Review 2 -->
-            <line class="fade-in delay-fade-2" x1="450" y1="140" x2="450" y2="20" stroke="#06B6D4" stroke-width="2"
+            <line class="fade-in delay-fade-2" x1="450" y1="220" x2="450" y2="20" stroke="#06B6D4" stroke-width="2"
               stroke-dasharray="4" />
             <circle class="fade-in delay-fade-2 dot-animate" cx="450" cy="20" r="5" fill="#06B6D4"
               style="transform-origin: 450px 20px" />
-            <path class="draw-line delay-2" d="M 450 20 Q 550 70 650 80" fill="none" stroke="url(#curveGrad3)"
+            <path class="draw-line delay-2" d="M 450 20 Q 550 103 650 120" fill="none" stroke="url(#curveGrad3)"
               stroke-width="4" stroke-linecap="round" />
 
             <!-- Review 3 (Optimal) -->
-            <line class="fade-in delay-fade-3" x1="650" y1="80" x2="650" y2="20" stroke="#EC4899" stroke-width="2"
+            <line class="fade-in delay-fade-3" x1="650" y1="120" x2="650" y2="20" stroke="#EC4899" stroke-width="2"
               stroke-dasharray="4" />
             <circle class="fade-in delay-fade-3 dot-animate" cx="650" cy="20" r="5" fill="#EC4899"
               style="transform-origin: 650px 20px" />
-            <path class="draw-line delay-3" d="M 650 20 Q 700 25 750 30" fill="none" stroke="url(#curveGrad4)"
+            <path class="draw-line delay-3" d="M 650 20 Q 700 28 750 36" fill="none" stroke="url(#curveGrad4)"
               stroke-width="4" stroke-linecap="round" />
 
           </svg>
@@ -389,36 +390,36 @@
       </div>
 
       <!-- Top Metrics Banner -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+      <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 shrink-0">
 
-        <div class="lab-panel p-4 rounded relative overflow-hidden">
-          <div class="text-xs text-lab-muted font-bold font-mono-lab">REVIEWS_DUE_TODAY</div>
-          <div class="text-3xl font-bold text-lab-yellow mt-2 font-mono-lab" id="metric-due-count">0</div>
-          <div class="text-[10px] text-lab-muted mt-1 font-bold">本日復習すべき項目</div>
-          <div class="absolute top-2 right-2 text-lab-yellow/20 text-4xl font-bold font-mono-lab">01</div>
+        <div class="lab-panel p-3 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">REVIEWS_DUE</div>
+          <div class="text-2xl font-bold text-lab-yellow mt-1 font-mono-lab" id="metric-due-count">0</div>
+          <div class="text-[9px] text-lab-muted mt-1 font-bold truncate">本日復習すべき項目</div>
+          <div class="absolute top-1 right-2 text-lab-yellow/20 text-3xl font-bold font-mono-lab">01</div>
         </div>
 
-        <div class="lab-panel p-4 rounded relative overflow-hidden">
-          <div class="text-xs text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
-          <div class="text-3xl font-bold text-lab-cyan mt-2 font-mono-lab" id="metric-active-count">0</div>
-          <div class="text-[10px] text-lab-muted mt-1 font-bold">学習進行中</div>
-          <div class="absolute top-2 right-2 text-lab-cyan/20 text-4xl font-bold font-mono-lab">02</div>
+        <div class="lab-panel p-3 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
+          <div class="text-2xl font-bold text-lab-cyan mt-1 font-mono-lab" id="metric-active-count">0</div>
+          <div class="text-[9px] text-lab-muted mt-1 font-bold truncate">学習進行中</div>
+          <div class="absolute top-1 right-2 text-lab-cyan/20 text-3xl font-bold font-mono-lab">02</div>
         </div>
 
-        <div class="lab-panel p-4 rounded relative overflow-hidden">
-          <div class="text-xs text-lab-muted font-bold font-mono-lab">COMPLETED_LOGS</div>
-          <div class="text-3xl font-bold text-lab-green mt-2 font-mono-lab" id="metric-completed-count">0</div>
-          <div class="text-[10px] text-lab-muted mt-1 font-bold">目標達成済み項目</div>
-          <div class="absolute top-2 right-2 text-lab-green/20 text-4xl font-bold font-mono-lab">03</div>
+        <div class="lab-panel p-3 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">COMPLETED</div>
+          <div class="text-2xl font-bold text-lab-green mt-1 font-mono-lab" id="metric-completed-count">0</div>
+          <div class="text-[9px] text-lab-muted mt-1 font-bold truncate">目標達成済み</div>
+          <div class="absolute top-1 right-2 text-lab-green/20 text-3xl font-bold font-mono-lab">03</div>
         </div>
 
-        <div class="lab-panel p-4 rounded relative overflow-hidden">
-          <div class="text-xs text-lab-muted font-bold font-mono-lab">AVG_STRENGTH (ACTIVE)</div>
-          <div class="text-3xl font-bold text-white mt-2 font-mono-lab" id="metric-avg-strength">0.0%</div>
-          <div class="w-full bg-lab-border rounded-full h-1.5 mt-2 overflow-hidden">
+        <div class="lab-panel p-3 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">AVG_STRENGTH</div>
+          <div class="text-2xl font-bold text-white mt-1 font-mono-lab" id="metric-avg-strength">0.0%</div>
+          <div class="w-full bg-lab-border rounded-full h-1.5 mt-1 overflow-hidden">
             <div id="metric-strength-bar" class="bg-white h-full w-0 transition-all duration-500"></div>
           </div>
-          <div class="absolute top-2 right-2 text-white/10 text-4xl font-bold font-mono-lab">04</div>
+          <div class="absolute top-1 right-2 text-white/10 text-3xl font-bold font-mono-lab">04</div>
         </div>
       </div>
 
