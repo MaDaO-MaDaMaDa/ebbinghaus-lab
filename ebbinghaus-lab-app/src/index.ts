@@ -335,14 +335,22 @@ app.post('/api/notifications/subscribe', async (c) => {
   try {
     const subscription = await c.req.json();
     const endpoint = subscription.endpoint;
-    const keys_p256dh = subscription.keys?.p256dh || null;
-    const keys_auth = subscription.keys?.auth || null;
-    
+    const p256dh = subscription.keys ? subscription.keys.p256dh : null;
+    const auth = subscription.keys ? subscription.keys.auth : null;
+
+    // Remove any older subscriptions for this user to prevent DB capacity growth 
+    // from repeated subscribe/unsubscribe actions generating new endpoints.
+    await c.env.DB.prepare(
+      `DELETE FROM subscriptions WHERE user_id = ? AND endpoint != ?`
+    ).bind(userId, endpoint).run();
+
     await c.env.DB.prepare(
       `INSERT INTO subscriptions (user_id, endpoint, keys_p256dh, keys_auth)
        VALUES (?, ?, ?, ?)
-       ON CONFLICT(user_id, endpoint) DO UPDATE SET keys_p256dh = excluded.keys_p256dh, keys_auth = excluded.keys_auth`
-    ).bind(userId, endpoint, keys_p256dh, keys_auth).run();
+       ON CONFLICT (user_id, endpoint) DO UPDATE SET
+       keys_p256dh=excluded.keys_p256dh,
+       keys_auth=excluded.keys_auth`
+    ).bind(userId, endpoint, p256dh, auth).run();
     
     return c.json({ success: true });
   } catch (err: any) {

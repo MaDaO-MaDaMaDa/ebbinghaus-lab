@@ -1,1 +1,0 @@
-ALTER TABLE items ADD COLUMN review_step INTEGER DEFAULT 0; ALTER TABLE items ADD COLUMN last_notified_at TEXT;
