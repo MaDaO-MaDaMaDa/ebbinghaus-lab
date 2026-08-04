@@ -487,6 +487,38 @@ app.get('/api/cron/trigger', async (c) => {
   return c.json({ success: true, message: 'Cron logic triggered manually for testing.' });
 });
 
+app.post('/api/debug/push-test', async (c) => {
+  checkDbBinding(c);
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return c.json({ error: 'Unauthorized' }, 401);
+  const token = authHeader.split(' ')[1];
+  let userId;
+  try {
+    const payload = await verify(token, getJwtSecret(c), 'HS256');
+    userId = payload.id as string;
+  } catch (e) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+
+  const { results: subscriptions } = await c.env.DB.prepare(
+    'SELECT * FROM subscriptions WHERE user_id = ?'
+  ).bind(userId).all();
+  
+  if (!subscriptions || subscriptions.length === 0) {
+    return c.json({ error: 'No push subscriptions found for this user.' }, 404);
+  }
+
+  let successCount = 0;
+  for (const sub of subscriptions) {
+    // we use a modified payload or the same sendWebPush. 
+    // sendWebPush doesn't take a custom payload, but that's fine, the SW will fetch /api/notifications/pending
+    const success = await sendWebPush(sub, c.env);
+    if (success) successCount++;
+  }
+  
+  return c.json({ success: true, sent: successCount, total: subscriptions.length });
+});
+
 export const honoApp = app;
 
 export default {
