@@ -243,7 +243,7 @@
     </section>
 
     <!-- ==================== 01. DASHBOARD VIEW ==================== -->
-    <section id="view-dashboard" class="hidden flex-col gap-4 md:gap-6">
+    <section id="view-dashboard" class="hidden flex flex-col gap-4 md:gap-6">
 
       <!-- Animated Forgetting Curve -->
       <div onclick="showEbbinghausExplanation()" class="lab-panel p-3 md:p-5 rounded relative border-t-2 border-t-lab-cyan shadow-xl cursor-pointer">
@@ -899,6 +899,7 @@
 
         if (v === viewName) {
           el?.classList.remove('hidden');
+          if (v === 'dashboard') el?.classList.add('flex');
           if (tab) {
             tab.classList.add('text-lab-cyan', 'bg-lab-border/50');
             tab.classList.remove('text-lab-muted');
@@ -909,6 +910,7 @@
           }
         } else {
           el?.classList.add('hidden');
+          if (v === 'dashboard') el?.classList.remove('flex');
           if (tab) {
             tab.classList.remove('text-lab-cyan', 'bg-lab-border/50');
             tab.classList.add('text-lab-muted');
