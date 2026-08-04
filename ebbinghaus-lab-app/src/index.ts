@@ -350,6 +350,34 @@ app.post('/api/notifications/subscribe', async (c) => {
   }
 });
 
+app.post('/api/notifications/unsubscribe', async (c) => {
+  checkDbBinding(c);
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const token = authHeader.split(' ')[1];
+  let userId;
+  try {
+    const payload = await verify(token, getJwtSecret(c), 'HS256');
+    userId = payload.id as string;
+  } catch (e) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+  try {
+    const subscription = await c.req.json();
+    const endpoint = subscription.endpoint;
+    
+    await c.env.DB.prepare(
+      `DELETE FROM subscriptions WHERE user_id = ? AND endpoint = ?`
+    ).bind(userId, endpoint).run();
+    
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.get('/api/notifications/pending', async (c) => {
   // This endpoint is called by the Service Worker during a 'push' event.
   // We can just return the generic message.
