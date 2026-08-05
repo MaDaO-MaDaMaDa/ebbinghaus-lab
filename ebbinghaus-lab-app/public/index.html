@@ -1314,6 +1314,39 @@
       });
     }
 
+    let lastLocalNotificationTime = 0;
+    function showLocalReviewNotification(dueCount) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      
+      const prefKey = 'notifications_enabled_' + (currentUser ? currentUser.username : '');
+      const localPref = localStorage.getItem(prefKey);
+      if (localPref !== 'true') return;
+
+      const now = Date.now();
+      // 1時間に1回だけローカル通知を許可する
+      if (now - lastLocalNotificationTime < 60 * 60 * 1000) return;
+      
+      lastLocalNotificationTime = now;
+      
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then(swRegistration => {
+          swRegistration.showNotification('復習の時間です！', {
+            body: `現在、${dueCount}件の復習項目があります。学習ログを復習しましょう。`,
+            icon: '/icon.svg',
+            badge: '/icon.svg',
+            tag: 'ebbinghaus-review',
+            data: { url: '/' }
+          });
+        }).catch(err => console.error('Local notification error:', err));
+      } else {
+        new Notification('復習の時間です！', {
+          body: `現在、${dueCount}件の復習項目があります。学習ログを復習しましょう。`,
+          icon: '/icon.svg',
+          tag: 'ebbinghaus-review'
+        });
+      }
+    }
+
     async function fetchItems() {
       if (!userToken) return;
       try {
@@ -1326,9 +1359,12 @@
         const activeItems = itemsState.filter(item => item.is_completed === 0);
         dueItemsState = activeItems.filter(item => !item.next_review_due || item.next_review_due <= todayStr);
 
+        if (dueItemsState.length > 0) {
+          showLocalReviewNotification(dueItemsState.length);
+        }
+
         updateDashboardMetrics();
         if (currentView === 'history') renderManagementTable();
-        if (currentView === 'reviews') renderReviewsView();
         if (currentView === 'reviews') renderReviewsView();
         
       } catch (err) {
