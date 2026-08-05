@@ -120,10 +120,56 @@
     .bg-critical-glow {
       animation: pulse-critical 4s ease-in-out infinite;
     }
+
+    /* ==========================================
+       Orientation Warning CSS
+       ========================================== */
+    #orientation-warning {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background-color: #080C14;
+      z-index: 2147483647;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+    }
+    body.show-orientation-warning #orientation-warning {
+      display: flex !important;
+    }
+    body.show-orientation-warning > *:not(#orientation-warning) {
+      display: none !important;
+    }
   </style>
+  <script>
+    function handleOrientationChange() {
+      if (!document.body) return;
+      const isLandscapeMedia = window.matchMedia('(orientation: landscape)').matches;
+      // 横向きの場合に警告表示用クラスを付与
+      if (isLandscapeMedia) {
+        document.body.classList.add('show-orientation-warning');
+      } else {
+        document.body.classList.remove('show-orientation-warning');
+      }
+    }
+    // DOM構築完了時に実行
+    document.addEventListener('DOMContentLoaded', handleOrientationChange);
+    window.addEventListener('load', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+  </script>
 </head>
 
 <body class="h-full flex flex-col antialiased selection:bg-lab-cyan selection:text-black overflow-hidden overscroll-none">
+  <!-- 縦画面要請UI -->
+  <div id="orientation-warning">
+    <div class="text-6xl mb-6">📱</div>
+    <h2 class="text-2xl text-lab-cyan font-mono-lab font-bold mb-4">縦向きでご利用ください</h2>
+    <p class="text-lab-muted text-sm font-sans">このアプリケーションは縦画面での利用に最適化されています。<br>端末を縦向きにしてご使用ください。</p>
+  </div>
   <!-- LOADING SCREEN -->
   
   <!-- CUSTOM LOADING SCREEN -->
