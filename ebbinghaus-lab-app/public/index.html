@@ -527,6 +527,24 @@
         </div>
       </div>
 
+      <!-- 復習タスク通知バナー -->
+      <div id="dashboard-review-alert" class="hidden shrink-0 lab-panel p-4 rounded border-l-4 border-lab-pink bg-lab-pink/10 relative overflow-hidden items-center justify-between cursor-pointer shadow-[0_0_15px_rgba(255,45,170,0.15)] transition-all hover:bg-lab-pink/20" onclick="switchView('reviews')">
+        <div class="flex items-center gap-3">
+          <div class="text-lab-pink animate-pulse">
+            <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="text-[10px] font-bold text-lab-pink font-mono-lab tracking-widest">[ACTION_REQUIRED]</div>
+            <div class="text-xs md:text-sm font-bold text-white mt-0.5">復習のタイミングが来ているタスクが <span id="dashboard-alert-count" class="text-lab-pink text-lg font-mono-lab px-1">0</span> 件あります！</div>
+          </div>
+        </div>
+        <button class="bg-lab-pink text-black font-bold px-4 py-2 rounded text-xs whitespace-nowrap hidden sm:block shadow-[0_0_10px_rgba(255,45,170,0.4)]">
+          今すぐ復習
+        </button>
+      </div>
+
     </section>
 
     <!-- ==================== 02. LOG HISTORY ==================== -->
@@ -1314,39 +1332,6 @@
       });
     }
 
-    let lastLocalNotificationTime = 0;
-    function showLocalReviewNotification(dueCount) {
-      if (!("Notification" in window) || Notification.permission !== "granted") return;
-      
-      const prefKey = 'notifications_enabled_' + (currentUser ? currentUser.username : '');
-      const localPref = localStorage.getItem(prefKey);
-      if (localPref !== 'true') return;
-
-      const now = Date.now();
-      // 1時間に1回だけローカル通知を許可する
-      if (now - lastLocalNotificationTime < 60 * 60 * 1000) return;
-      
-      lastLocalNotificationTime = now;
-      
-      if (navigator.serviceWorker) {
-        navigator.serviceWorker.ready.then(swRegistration => {
-          swRegistration.showNotification('復習の時間です！', {
-            body: `現在、${dueCount}件の復習項目があります。学習ログを復習しましょう。`,
-            icon: '/icon.svg',
-            badge: '/icon.svg',
-            tag: 'ebbinghaus-review',
-            data: { url: '/' }
-          });
-        }).catch(err => console.error('Local notification error:', err));
-      } else {
-        new Notification('復習の時間です！', {
-          body: `現在、${dueCount}件の復習項目があります。学習ログを復習しましょう。`,
-          icon: '/icon.svg',
-          tag: 'ebbinghaus-review'
-        });
-      }
-    }
-
     async function fetchItems() {
       if (!userToken) return;
       try {
@@ -1358,10 +1343,6 @@
         const todayStr = data.today || new Date().toISOString().replace('T', ' ').substring(0, 19);
         const activeItems = itemsState.filter(item => item.is_completed === 0);
         dueItemsState = activeItems.filter(item => !item.next_review_due || item.next_review_due <= todayStr);
-
-        if (dueItemsState.length > 0) {
-          showLocalReviewNotification(dueItemsState.length);
-        }
 
         updateDashboardMetrics();
         if (currentView === 'history') renderManagementTable();
@@ -1387,6 +1368,19 @@
       if (mobBadge) {
         if (dueCount > 0) mobBadge.classList.remove('hidden');
         else mobBadge.classList.add('hidden');
+      }
+
+      const alertBanner = document.getElementById('dashboard-review-alert');
+      const alertCount = document.getElementById('dashboard-alert-count');
+      if (alertBanner && alertCount) {
+        if (dueCount > 0) {
+          alertCount.innerText = dueCount;
+          alertBanner.classList.remove('hidden');
+          alertBanner.classList.add('flex');
+        } else {
+          alertBanner.classList.add('hidden');
+          alertBanner.classList.remove('flex');
+        }
       }
 
       let avgStrength = 0;
