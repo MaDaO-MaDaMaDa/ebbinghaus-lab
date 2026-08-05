@@ -133,7 +133,7 @@ app.get('/api/auth/me', async (c) => {
     return c.json({ error: 'Unauthorized: No token provided' }, 401);
   }
   const token = authHeader.split(' ')[1];
-  
+
   let payload;
   try {
     payload = await verify(token, getJwtSecret(c), 'HS256');
@@ -157,7 +157,7 @@ app.put('/api/auth/password', async (c) => {
     return c.json({ error: 'Unauthorized: No token provided' }, 401);
   }
   const token = authHeader.split(' ')[1];
-  
+
   let payload;
   try {
     payload = await verify(token, getJwtSecret(c), 'HS256');
@@ -171,10 +171,10 @@ app.put('/api/auth/password', async (c) => {
   }
 
   const currentHash = await hashPassword(body.currentPassword);
-  
+
   const user = await c.env.DB.prepare('SELECT id FROM users WHERE id = ? AND password_hash = ?')
     .bind(payload.id, currentHash).first();
-    
+
   if (!user) {
     return c.json({ error: '現在のパスワードが正しくありません' }, 401);
   }
@@ -351,7 +351,7 @@ app.post('/api/notifications/subscribe', async (c) => {
        keys_p256dh=excluded.keys_p256dh,
        keys_auth=excluded.keys_auth`
     ).bind(userId, endpoint, p256dh, auth).run();
-    
+
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -375,11 +375,11 @@ app.post('/api/notifications/unsubscribe', async (c) => {
   try {
     const subscription = await c.req.json();
     const endpoint = subscription.endpoint;
-    
+
     await c.env.DB.prepare(
       `DELETE FROM subscriptions WHERE user_id = ? AND endpoint = ?`
     ).bind(userId, endpoint).run();
-    
+
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -405,10 +405,10 @@ function b64url(buf: ArrayBuffer | Uint8Array): string {
 
 async function sendWebPush(subscription: any, env: Bindings) {
   const endpoint = new URL(subscription.endpoint);
-  
+
   const header = { typ: 'JWT', alg: 'ES256' };
   const encodedHeader = b64url(new TextEncoder().encode(JSON.stringify(header)));
-  
+
   const jwtPayload = {
     aud: `${endpoint.protocol}//${endpoint.host}`,
     exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
@@ -416,7 +416,7 @@ async function sendWebPush(subscription: any, env: Bindings) {
   };
   const encodedPayload = b64url(new TextEncoder().encode(JSON.stringify(jwtPayload)));
   const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-  
+
   try {
     const privateKeyJwk = JSON.parse(env.VAPID_PRIVATE_JWK);
     const key = await crypto.subtle.importKey(
@@ -426,21 +426,21 @@ async function sendWebPush(subscription: any, env: Bindings) {
       false,
       ['sign']
     );
-    
+
     const signature = await crypto.subtle.sign(
       { name: 'ECDSA', hash: 'SHA-256' },
       key,
       new TextEncoder().encode(unsignedToken)
     );
-    
+
     const encodedSignature = b64url(signature);
     const jwt = `${unsignedToken}.${encodedSignature}`;
-    
+
     const headers = {
       'Authorization': `vapid t=${jwt}, k=${env.VAPID_PUBLIC_KEY}`,
       'TTL': '60'
     };
-    
+
     const res = await fetch(subscription.endpoint, { method: 'POST', headers });
     if (!res.ok) {
       if (res.status === 410 || res.status === 404) {
@@ -466,17 +466,17 @@ async function triggerCron(env: Bindings) {
           OR last_notified_at < next_review_due 
           OR datetime(last_notified_at, '+1 hour') <= ?)`
   ).bind(now, now).all();
-  
+
   if (!dueItems || dueItems.length === 0) return;
-  
+
   const dueUserIds = dueItems.map(item => (item as any).user_id);
   const placeholders = dueUserIds.map(() => '?').join(',');
   const { results: subscriptions } = await env.DB.prepare(
     `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
   ).bind(...dueUserIds).all();
-  
+
   if (!subscriptions) return;
-  
+
   for (const sub of subscriptions) {
     await sendWebPush(sub, env);
   }
@@ -513,7 +513,7 @@ app.post('/api/debug/push-test', async (c) => {
   const { results: subscriptions } = await c.env.DB.prepare(
     'SELECT * FROM subscriptions WHERE user_id = ?'
   ).bind(userId).all();
-  
+
   if (!subscriptions || subscriptions.length === 0) {
     return c.json({ error: 'No push subscriptions found for this user.' }, 404);
   }
@@ -525,7 +525,7 @@ app.post('/api/debug/push-test', async (c) => {
     const success = await sendWebPush(sub, c.env);
     if (success) successCount++;
   }
-  
+
   return c.json({ success: true, sent: successCount, total: subscriptions.length });
 });
 
