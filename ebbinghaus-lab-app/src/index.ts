@@ -459,8 +459,13 @@ async function sendWebPush(subscription: any, env: Bindings) {
 async function triggerCron(env: Bindings) {
   const now = formatDateTime(new Date());
   const { results: dueItems } = await env.DB.prepare(
-    'SELECT DISTINCT user_id FROM items WHERE is_completed = 0 AND next_review_due <= ? AND (last_notified_at IS NULL OR last_notified_at < next_review_due)'
-  ).bind(now).all();
+    `SELECT DISTINCT user_id FROM items 
+     WHERE is_completed = 0 
+     AND next_review_due <= ? 
+     AND (last_notified_at IS NULL 
+          OR last_notified_at < next_review_due 
+          OR datetime(last_notified_at, '+1 hour') <= ?)`
+  ).bind(now, now).all();
   
   if (!dueItems || dueItems.length === 0) return;
   
@@ -476,10 +481,15 @@ async function triggerCron(env: Bindings) {
     await sendWebPush(sub, env);
   }
 
-  // Update last_notified_at for the due items so we don't notify again until their next review
+  // Update last_notified_at for the due items so we don't notify again until their next review or 1 hour passes
   await env.DB.prepare(
-    'UPDATE items SET last_notified_at = ? WHERE is_completed = 0 AND next_review_due <= ? AND (last_notified_at IS NULL OR last_notified_at < next_review_due)'
-  ).bind(now, now).run();
+    `UPDATE items SET last_notified_at = ? 
+     WHERE is_completed = 0 
+     AND next_review_due <= ? 
+     AND (last_notified_at IS NULL 
+          OR last_notified_at < next_review_due 
+          OR datetime(last_notified_at, '+1 hour') <= ?)`
+  ).bind(now, now, now).run();
 }
 
 app.get('/api/cron/trigger', async (c) => {

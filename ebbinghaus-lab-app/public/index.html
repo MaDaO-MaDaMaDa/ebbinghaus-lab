@@ -496,34 +496,36 @@
         </button>
       </div>
 
-      <!-- Add New Item Form -->
-      <div id="add-item-form-panel" class="hidden lab-panel p-6 rounded border-l-4 border-l-lab-cyan space-y-4">
-        <h3 class="text-sm font-bold text-white tracking-wider font-mono-lab">[NEW_LOG_ENTRY]</h3>
+      <!-- Add New Item Modal -->
+      <div id="add-item-form-panel" class="hidden fixed inset-0 z-[100] items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="toggleAddItemForm(false)"></div>
+        <div class="relative w-full max-w-md lab-panel p-6 rounded border-l-4 border-l-lab-cyan space-y-4 shadow-[0_0_30px_rgba(6,182,212,0.2)] z-10">
+          <h3 class="text-sm font-bold text-white tracking-wider font-mono-lab">[NEW_LOG_ENTRY]</h3>
+          <form onsubmit="handleCreateItem(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-lab-muted mb-1">学習内容 (Topic)</label>
+              <input type="text" id="input-topic" required placeholder="【エビングハウスの忘却曲線とは】" oninput="clearMemoPlaceholder()"
+                class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-semibold">
+            </div>
 
-        <form onsubmit="handleCreateItem(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-lab-muted mb-1">学習内容 (Topic)</label>
-            <input type="text" id="input-topic" required placeholder="【エビングハウスの忘却曲線とは】"
-              class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-semibold">
-          </div>
+            <div>
+              <label class="block text-xs font-bold text-lab-muted mb-1">メモ・詳細 (Memo) - 任意</label>
+              <textarea id="input-memo" rows="5" placeholder="【ドイツの心理学者ヘルマン・エビングハウスが提唱した、「人間が一度覚えたことをどれくらいの時間や労力で覚え直せるか（節約率）」を時間経過とともに表したグラフです。】"
+                class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan"></textarea>
+            </div>
 
-          <div>
-            <label class="block text-xs font-bold text-lab-muted mb-1">メモ・詳細 (Memo) - 任意</label>
-            <textarea id="input-memo" rows="3" placeholder="【ドイツの心理学者ヘルマン・エビングハウスが提唱した、「人間が一度覚えたことをどれくらいの時間や労力で覚え直せるか（節約率）」を時間経過とともに表したグラフです。】"
-              class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan"></textarea>
-          </div>
-
-          <div class="flex justify-end gap-3 pt-4">
-            <button type="button" onclick="toggleAddItemForm(false)"
-              class="px-5 py-2.5 text-sm font-bold text-lab-muted hover:text-white">
-              キャンセル
-            </button>
-            <button type="submit"
-              class="bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-2.5 rounded transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">
-              記録を保存
-            </button>
-          </div>
-        </form>
+            <div class="flex justify-end gap-3 pt-4">
+              <button type="button" onclick="toggleAddItemForm(false)"
+                class="px-5 py-2.5 text-sm font-bold text-lab-muted hover:text-white">
+                キャンセル
+              </button>
+              <button type="submit"
+                class="bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-2.5 rounded transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                記録を保存
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <!-- Data Table List -->
@@ -606,9 +608,25 @@
           </div>
         </div>
 
-        <!-- CHANGE PASSWORD -->
+        <!-- CHANGE PASSWORD BUTTON -->
         <div class="pt-6 border-t border-lab-border/50">
-          <h3 class="text-md font-bold text-white mb-4">パスワードの変更</h3>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-md font-bold text-white mb-1">パスワードの変更</h3>
+              <p class="text-xs text-lab-muted">アカウントのパスワードを変更します。</p>
+            </div>
+            <button onclick="toggleChangePasswordModal(true)"
+              class="bg-lab-panel border border-lab-cyan text-lab-cyan hover:bg-lab-cyan hover:text-black font-bold text-xs px-4 py-2 rounded transition whitespace-nowrap">
+              パスワードを変更
+            </button>
+          </div>
+        </div>
+
+      <!-- Change Password Modal -->
+      <div id="change-password-modal" class="hidden fixed inset-0 z-[100] items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="toggleChangePasswordModal(false)"></div>
+        <div class="relative w-full max-w-md lab-panel p-6 rounded border-l-4 border-l-lab-cyan space-y-4 shadow-[0_0_30px_rgba(6,182,212,0.2)] z-10">
+          <h3 class="text-sm font-bold text-white tracking-wider font-mono-lab">[CHANGE_PASSWORD]</h3>
           <form id="change-password-form" onsubmit="handleChangePassword(event)" class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-lab-muted mb-1">現在のパスワード</label>
@@ -654,12 +672,19 @@
                 </button>
               </div>
             </div>
-            <div class="pt-2 flex items-center justify-between">
+            <div class="flex justify-end gap-3 pt-4">
+              <button type="button" onclick="toggleChangePasswordModal(false)"
+                class="px-5 py-2.5 text-sm font-bold text-lab-muted hover:text-white">
+                キャンセル
+              </button>
               <button type="submit" id="cp-submit-btn"
-                class="bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-2 rounded transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">変更を保存</button>
+                class="bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-2.5 rounded transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                変更を保存
+              </button>
             </div>
           </form>
         </div>
+      </div>
 
         <!-- LOGOUT -->
         <div class="pt-6 border-t border-lab-border/50">
@@ -674,9 +699,16 @@
     <!-- ==================== DEBUG VIEW ==================== -->
     <section id="view-debug" class="hidden flex-col h-full gap-6">
       <div class="lab-panel p-5 md:p-8 rounded border-t-2 border-t-lab-yellow space-y-8">
-        <div>
-          <span class="text-xs font-bold text-lab-yellow tracking-wider font-mono-lab">[DEBUG_MODE]</span>
-          <h2 class="text-xl font-bold text-white mt-1">開発者用デバッグメニュー</h2>
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="text-xs font-bold text-lab-yellow tracking-wider font-mono-lab">[DEBUG_MODE]</span>
+            <h2 class="text-xl font-bold text-white mt-1">開発者用デバッグメニュー</h2>
+          </div>
+          <button onclick="switchView('dashboard')" class="text-lab-muted hover:text-white p-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
         </div>
 
         <div class="space-y-4">
@@ -1408,12 +1440,35 @@
       const panel = document.getElementById('add-item-form-panel');
       if (show === true) {
         panel.classList.remove('hidden');
+        panel.classList.add('flex');
         document.getElementById('input-topic').focus();
       } else if (show === false) {
         panel.classList.add('hidden');
+        panel.classList.remove('flex');
       } else {
         panel.classList.toggle('hidden');
+        panel.classList.toggle('flex');
         if (!panel.classList.contains('hidden')) document.getElementById('input-topic').focus();
+      }
+    }
+
+    function clearMemoPlaceholder() {
+      document.getElementById('input-memo').placeholder = '';
+    }
+
+    function toggleChangePasswordModal(show = null) {
+      const modal = document.getElementById('change-password-modal');
+      if (show === true) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.getElementById('cp-current').focus();
+      } else if (show === false) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      } else {
+        modal.classList.toggle('hidden');
+        modal.classList.toggle('flex');
+        if (!modal.classList.contains('hidden')) document.getElementById('cp-current').focus();
       }
     }
 
@@ -1538,26 +1593,38 @@
           }
         });
       } else {
-        // Unsubscribe
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.ready.then(async (sw) => {
-            try {
-              const subscription = await sw.pushManager.getSubscription();
-              if (subscription) {
-                await fetch('/api/notifications/unsubscribe', {
-                  method: 'POST',
-                  headers: getHeaders(),
-                  body: JSON.stringify(subscription)
-                });
-                await subscription.unsubscribe();
+        e.preventDefault();
+        const checkbox = e.target;
+        checkbox.checked = true; // revert visually to true
+
+        showCustomModal({
+          title: '確認',
+          message: '通知をオフにすると、最適な復習タイミングをお知らせすることができなくなります。本当によろしいですか？',
+          confirmText: 'オフにする',
+          cancelText: 'キャンセル',
+          onConfirm: async () => {
+            if ('serviceWorker' in navigator) {
+              try {
+                const sw = await navigator.serviceWorker.ready;
+                const subscription = await sw.pushManager.getSubscription();
+                if (subscription) {
+                  await fetch('/api/notifications/unsubscribe', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(subscription)
+                  });
+                  await subscription.unsubscribe();
+                }
+                checkbox.checked = false; // confirm visual change
                 showToast('通知をオフにしました');
+              } catch (err) {
+                console.error('Unsubscribe failed:', err);
+                showToast('通知の解除に失敗しました');
+                checkbox.checked = true; // revert on failure
               }
-            } catch (err) {
-              console.error('Unsubscribe failed:', err);
-              showToast('通知の解除に失敗しました');
             }
-          });
-        }
+          }
+        });
       }
     }
 
