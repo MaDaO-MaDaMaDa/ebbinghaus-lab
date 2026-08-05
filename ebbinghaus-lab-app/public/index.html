@@ -258,8 +258,8 @@
 
       <!-- Animated Forgetting Curve -->
       <div onclick="showEbbinghausExplanation()" class="lab-panel p-2 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-none md:h-1/2 flex flex-col mb-1 md:mb-2">
-        <div class="w-full flex-1 relative flex items-center justify-center">
-          <svg id="ebbinghaus-svg" viewBox="30 -5 920 530" class="w-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet" style="display:block;">
+        <div class="w-full flex-1 relative flex items-center justify-center min-h-0">
+          <svg id="ebbinghaus-svg" viewBox="30 -5 920 530" class="w-full h-auto md:w-full md:h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet" style="display:block; max-height: 100%;">
             <defs>
               <linearGradient id="curveGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stop-color="#EF4444" />
@@ -887,6 +887,17 @@
       return m + '/' + d;
     }
 
+    function urlB64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
     async function checkAuthStatus() {
       if (!userToken) {
         showAuthScreen();
@@ -914,9 +925,44 @@
             headers: { 'Authorization': 'Bearer ' + userToken }
           });
           const statusData = await safeParseJson(statusRes);
-          if (statusRes.ok && statusData.subscribed !== undefined) {
-            const toggle = document.getElementById('notification-toggle');
-            if (toggle) toggle.checked = statusData.subscribed;
+          const toggle = document.getElementById('notification-toggle');
+          
+          const prefKey = 'notifications_enabled_' + currentUser.username;
+          const localPref = localStorage.getItem(prefKey);
+
+          if (localPref === 'true') {
+            if (toggle) toggle.checked = true;
+            // Silent resubscription if needed
+            if ("Notification" in window && Notification.permission === 'granted' && navigator.serviceWorker) {
+              navigator.serviceWorker.ready.then(async sw => {
+                let sub = await sw.pushManager.getSubscription();
+                if (!sub) {
+                  const vapidRes = await fetch('/api/notifications/vapid-key', { headers: getHeaders() });
+                  const { publicKey } = await vapidRes.json();
+                  if (publicKey) {
+                    sub = await sw.pushManager.subscribe({
+                      userVisibleOnly: true,
+                      applicationServerKey: urlB64ToUint8Array(publicKey)
+                    });
+                  }
+                }
+                if (sub) {
+                  await fetch('/api/notifications/subscribe', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(sub)
+                  });
+                }
+              }).catch(err => console.error('Silent sub error:', err));
+            }
+          } else if (localPref === 'false') {
+            if (toggle) toggle.checked = false;
+          } else {
+            // Fallback to backend status if not set locally
+            if (statusRes.ok && statusData.subscribed !== undefined) {
+              if (toggle) toggle.checked = statusData.subscribed;
+              localStorage.setItem(prefKey, statusData.subscribed ? 'true' : 'false');
+            }
           }
         } catch (e) {
           console.error('Failed to fetch notification status', e);
@@ -1552,6 +1598,7 @@
     }
 
     function handleNotificationToggle(e) {
+      const prefKey = 'notifications_enabled_' + currentUser.username;
       if (e.target.checked) {
         if (!("Notification" in window)) {
           showToast('このブラウザは通知をサポートしていません');
@@ -1566,17 +1613,6 @@
               const { publicKey } = await vapidRes.json();
               
               if (!publicKey) throw new Error('VAPID public key not found');
-
-              function urlB64ToUint8Array(base64String) {
-                const padding = '='.repeat((4 - base64String.length % 4) % 4);
-                const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-                const rawData = window.atob(base64);
-                const outputArray = new Uint8Array(rawData.length);
-                for (let i = 0; i < rawData.length; ++i) {
-                  outputArray[i] = rawData.charCodeAt(i);
-                }
-                return outputArray;
-              }
               
               const subscription = await sw.pushManager.subscribe({
                 userVisibleOnly: true,
@@ -1590,15 +1626,18 @@
               });
               
               if (!res.ok) throw new Error('Subscription failed');
+              localStorage.setItem(prefKey, 'true');
               showToast('通知が許可されました。復習の時間にお知らせします！');
             } catch (err) {
               console.error(err);
               showToast('通知の登録に失敗しました: ' + err.message);
               e.target.checked = false;
+              localStorage.setItem(prefKey, 'false');
             }
           } else {
             showToast('通知がブロックされました。ブラウザの設定をご確認ください。');
             e.target.checked = false;
+            localStorage.setItem(prefKey, 'false');
           }
         });
       } else {
@@ -1624,6 +1663,7 @@
                   });
                   await subscription.unsubscribe();
                 }
+                localStorage.setItem(prefKey, 'false');
                 checkbox.checked = false; // confirm visual change
                 showToast('通知をオフにしました');
               } catch (err) {
