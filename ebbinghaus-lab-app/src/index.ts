@@ -464,7 +464,7 @@ async function triggerCron(env: Bindings) {
      AND next_review_due <= ? 
      AND (last_notified_at IS NULL 
           OR last_notified_at < next_review_due 
-          OR datetime(last_notified_at, '+1 hour') <= ?)`
+          OR datetime(last_notified_at, '+20 minutes') <= ?)`
   ).bind(now, now).all();
 
   if (!dueItems || dueItems.length === 0) return;
@@ -481,14 +481,14 @@ async function triggerCron(env: Bindings) {
     await sendWebPush(sub, env);
   }
 
-  // Update last_notified_at for the due items so we don't notify again until their next review or 1 hour passes
+  // Update last_notified_at for the due items so we don't notify again until their next review or 20 minutes passes
   await env.DB.prepare(
     `UPDATE items SET last_notified_at = ? 
      WHERE is_completed = 0 
      AND next_review_due <= ? 
      AND (last_notified_at IS NULL 
           OR last_notified_at < next_review_due 
-          OR datetime(last_notified_at, '+1 hour') <= ?)`
+          OR datetime(last_notified_at, '+20 minutes') <= ?)`
   ).bind(now, now, now).run();
 }
 
