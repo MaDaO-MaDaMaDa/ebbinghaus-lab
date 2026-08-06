@@ -892,11 +892,20 @@
     let isRegisterMode = false;
     let userToken = localStorage.getItem('ebbinghaus_token') || null;
     let currentUser = null;
+    let nextReviewTimer = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       startClock();
       registerServiceWorker();
       checkAuthStatus();
+
+      // バックグラウンドからの復帰時にデータを更新
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && userToken) {
+          fetchItems();
+        }
+      });
+
     });
 
     function registerServiceWorker() {
@@ -1348,10 +1357,45 @@
         if (currentView === 'history') renderManagementTable();
         if (currentView === 'reviews') renderReviewsView();
         
+        scheduleNextReviewFetch();
       } catch (err) {
         showToast('データの取得に失敗しました');
         console.error(err);
         if (err.message === 'API Error') logout();
+      }
+    }
+
+    function scheduleNextReviewFetch() {
+      if (nextReviewTimer) {
+        clearTimeout(nextReviewTimer);
+        nextReviewTimer = null;
+      }
+      
+      const activeItems = itemsState.filter(item => item.is_completed === 0 && item.next_review_due);
+      if (activeItems.length === 0) return;
+
+      const now = new Date();
+      let nextDueTime = null;
+
+      activeItems.forEach(item => {
+        const dueStr = String(item.next_review_due);
+        const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
+        const dueDate = new Date(dueStrUtc);
+        
+        if (dueDate > now) {
+          if (!nextDueTime || dueDate < nextDueTime) {
+            nextDueTime = dueDate;
+          }
+        }
+      });
+
+      if (nextDueTime) {
+        // 時間ピッタリではなく2秒遅延させて確実にDUE判定に入るようにする
+        const delay = nextDueTime.getTime() - now.getTime() + 2000;
+        const safeDelay = Math.min(delay, 2147483647);
+        nextReviewTimer = setTimeout(() => {
+          if (userToken) fetchItems();
+        }, safeDelay);
       }
     }
 
@@ -1531,11 +1575,19 @@
         );
       }).join('');
 
-      const todayStr = new Date().toISOString().substring(0, 10);
+      const localToday = new Date();
+      localToday.setHours(0, 0, 0, 0);
       mobileList.innerHTML = itemsState.map(rowMapper).map(function (obj) {
         const { item, currentPct, targetPct, isCompleted, statusBadge } = obj;
         let statusHtml = '';
-        if (item.next_review_due && item.next_review_due.substring(0, 10) < todayStr) {
+        let isOverdue = false;
+        if (item.next_review_due) {
+          const d = new Date(item.next_review_due.replace(' ', 'T') + 'Z');
+          d.setHours(0, 0, 0, 0);
+          if (d < localToday) isOverdue = true;
+        }
+
+        if (isOverdue) {
           statusHtml = '<span class="text-lab-red text-xs font-bold font-mono-lab">OVERDUE</span>';
         } else if (isCompleted) {
           statusHtml = '<span class="text-lab-muted text-xs font-bold font-mono-lab">DONE</span>';
