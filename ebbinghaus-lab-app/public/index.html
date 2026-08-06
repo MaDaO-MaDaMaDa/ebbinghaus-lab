@@ -545,25 +545,33 @@
         </button>
       </div>
       <!-- Dashboard Actions -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 shrink-0">
+      <div class="grid grid-cols-2 gap-3 md:gap-4 shrink-0">
         <!-- New Task Button -->
         <button onclick="switchView('history'); setTimeout(() => toggleAddItemForm(true), 100);"
-          class="bg-lab-panel border border-lab-border hover:bg-lab-cyan/10 hover:border-lab-cyan group rounded p-4 md:p-5 text-left transition flex items-center justify-between">
-          <div>
-            <div class="text-xs font-bold text-lab-cyan font-mono-lab mb-1 group-hover:text-cyan-300">[ACTION]</div>
-            <div class="text-base md:text-lg font-bold text-white">新しい学習を記録</div>
+          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-cyan group rounded-xl p-3 md:p-4 text-center transition-all flex flex-col items-center justify-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:-translate-y-1 active:translate-y-0">
+          <div class="absolute inset-0 bg-lab-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-lab-cyan/10 flex items-center justify-center text-lab-cyan group-hover:scale-110 group-hover:bg-lab-cyan/20 transition-all border border-lab-cyan/20">
+            <span class="text-2xl md:text-3xl mb-0.5">+</span>
           </div>
-          <div class="text-2xl md:text-3xl text-lab-cyan group-hover:scale-110 transition">+</div>
+          <div class="relative z-10 w-full">
+            <div class="text-[9px] md:text-xs font-bold text-lab-cyan font-mono-lab mb-0.5 group-hover:text-cyan-300">[ACTION]</div>
+            <div class="text-xs md:text-base font-bold text-white leading-tight break-words">新しい学習を記録</div>
+          </div>
         </button>
 
         <!-- Completed Tasks Button -->
         <button onclick="openCompletedTasksModal()"
-          class="bg-lab-panel border border-lab-border hover:bg-lab-green/10 hover:border-lab-green group rounded p-4 md:p-5 text-left transition flex items-center justify-between">
-          <div>
-            <div class="text-xs font-bold text-lab-green font-mono-lab mb-1 group-hover:text-green-300">[ACTION]</div>
-            <div class="text-base md:text-lg font-bold text-white">完了済みタスク一覧</div>
+          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-green group rounded-xl p-3 md:p-4 text-center transition-all flex flex-col items-center justify-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:-translate-y-1 active:translate-y-0">
+          <div class="absolute inset-0 bg-lab-green/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-lab-green/10 flex items-center justify-center text-lab-green group-hover:scale-110 group-hover:bg-lab-green/20 transition-all border border-lab-green/20">
+            <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+            </svg>
           </div>
-          <div class="text-2xl md:text-3xl text-lab-green group-hover:scale-110 transition">✓</div>
+          <div class="relative z-10 w-full">
+            <div class="text-[9px] md:text-xs font-bold text-lab-green font-mono-lab mb-0.5 group-hover:text-green-300">[ACTION]</div>
+            <div class="text-xs md:text-base font-bold text-white leading-tight break-words">完了済タスク一覧</div>
+          </div>
         </button>
       </div>
       <!-- Completed Tasks Modal -->
