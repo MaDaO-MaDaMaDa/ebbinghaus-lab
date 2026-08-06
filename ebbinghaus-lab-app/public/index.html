@@ -1191,7 +1191,7 @@
 
         if (v === viewName) {
           el?.classList.remove('hidden');
-          if (v === 'dashboard') el?.classList.add('flex');
+          el?.classList.add('flex');
           if (tab) {
             tab.classList.add('text-lab-cyan', 'bg-lab-border/50');
             tab.classList.remove('text-lab-muted');
@@ -1202,7 +1202,7 @@
           }
         } else {
           el?.classList.add('hidden');
-          if (v === 'dashboard') el?.classList.remove('flex');
+          el?.classList.remove('flex');
           if (tab) {
             tab.classList.remove('text-lab-cyan', 'bg-lab-border/50');
             tab.classList.add('text-lab-muted');
