@@ -300,7 +300,7 @@
     </section>
 
     <!-- ==================== 01. DASHBOARD VIEW ==================== -->
-    <section id="view-dashboard" class="hidden flex-col h-full gap-2 md:gap-6 overflow-y-auto overflow-x-hidden">
+    <section id="view-dashboard" class="hidden flex-col flex-1 min-h-0 gap-2 md:gap-6 overflow-y-auto overflow-x-hidden">
 
       <!-- Animated Forgetting Curve -->
       <div onclick="showEbbinghausExplanation()" class="lab-panel p-2 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-none md:h-1/2 flex flex-col mb-1 md:mb-2">
@@ -543,6 +543,7 @@
         <button class="bg-lab-pink text-black font-bold px-4 py-2 rounded text-xs whitespace-nowrap hidden sm:block shadow-[0_0_10px_rgba(255,45,170,0.4)]">
           今すぐ復習
         </button>
+      </div>
       <!-- Dashboard Actions -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- New Task Button -->
@@ -587,7 +588,7 @@
     </section>
 
     <!-- ==================== 02. LOG HISTORY ==================== -->
-    <section id="view-history" class="hidden flex-col h-full gap-6">
+    <section id="view-history" class="hidden flex-col flex-1 min-h-0 gap-6">
       <div class="flex justify-between items-center border-b border-lab-border pb-4">
         <div>
           <span class="text-xs font-bold text-white tracking-wider font-mono-lab">[ACTIVE_TASKS]</span>
@@ -664,7 +665,7 @@
     </section>
 
     <!-- ==================== 03. DUE REVIEWS VIEW ==================== -->
-    <section id="view-reviews" class="hidden flex-col h-full gap-6 overflow-y-auto overflow-x-hidden">
+    <section id="view-reviews" class="hidden flex-col flex-1 min-h-0 gap-6 overflow-y-auto overflow-x-hidden">
       <div class="flex justify-between items-center border-b border-lab-border pb-4">
         <div>
           <span class="text-xs font-bold text-lab-yellow tracking-wider font-mono-lab">[DUE_REVIEWS]</span>
@@ -682,7 +683,7 @@
     </section>
 
     <!-- ==================== 04. ACCOUNT VIEW ==================== -->
-    <section id="view-account" class="hidden flex-col h-full gap-6 overflow-y-auto overflow-x-hidden">
+    <section id="view-account" class="hidden flex-col flex-1 min-h-0 gap-6 overflow-y-auto overflow-x-hidden">
       <div class="lab-panel p-5 md:p-8 rounded border-t-2 border-t-lab-cyan space-y-8">
         <div>
           <span class="text-xs font-bold text-white tracking-wider font-mono-lab">[ACCOUNT_SETTINGS]</span>
@@ -800,7 +801,7 @@
     </section>
 
     <!-- ==================== DEBUG VIEW ==================== -->
-    <section id="view-debug" class="hidden flex-col h-full gap-6 overflow-y-auto overflow-x-hidden">
+    <section id="view-debug" class="hidden flex-col flex-1 min-h-0 gap-6 overflow-y-auto overflow-x-hidden">
       <div class="lab-panel p-5 md:p-8 rounded border-t-2 border-t-lab-yellow space-y-8">
         <div class="flex justify-between items-start">
           <div>
