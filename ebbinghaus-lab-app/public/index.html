@@ -632,6 +632,37 @@
         </div>
       </div>
 
+      <!-- Edit Item Modal -->
+      <div id="edit-item-form-panel" class="hidden fixed inset-0 z-[100] items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="toggleEditItemForm(false)"></div>
+        <div class="relative w-full max-w-md lab-panel p-6 rounded border-l-4 border-l-lab-cyan space-y-4 shadow-[0_0_30px_rgba(6,182,212,0.2)] z-10">
+          <h3 class="text-sm font-bold text-white tracking-wider font-mono-lab">[EDIT_LOG_ENTRY]</h3>
+          <form onsubmit="handleEditItem(event)" class="space-y-4">
+            <input type="hidden" id="edit-input-id">
+            <div>
+              <label class="block text-xs font-bold text-lab-muted mb-1">学習内容 (Topic)</label>
+              <input type="text" id="edit-input-topic" required
+                class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan font-semibold">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-lab-muted mb-1">メモ・詳細 (Memo) - 任意</label>
+              <textarea id="edit-input-memo" rows="5"
+                class="w-full bg-lab-bg border border-lab-border rounded p-3 text-sm text-white focus:outline-none focus:border-lab-cyan"></textarea>
+            </div>
+            <div class="flex justify-end gap-3 pt-4">
+              <button type="button" onclick="toggleEditItemForm(false)"
+                class="px-5 py-2.5 text-sm font-bold text-lab-muted hover:text-white">
+                キャンセル
+              </button>
+              <button type="submit"
+                class="bg-lab-cyan text-black hover:bg-cyan-300 font-bold text-sm px-6 py-2.5 rounded transition shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                更新を保存
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- Data Table List -->
       <div class="lab-panel rounded overflow-hidden flex flex-col flex-1 min-h-0">
         <div class="p-4 bg-lab-panel/80 border-b border-lab-border flex justify-between items-center">
@@ -1622,7 +1653,10 @@
           '</div>' +
           '</td>' +
           '<td class="p-3 font-mono-lab text-xs font-bold ' + (isCompleted ? 'text-lab-muted' : 'text-lab-yellow') + '">' + formatDisplayDate(item.next_review_due) + '</td>' +
-          '<td class="p-3 text-right">' +
+          '<td class="p-3 text-right flex justify-end items-center gap-2">' +
+          '<button onclick="openEditItemForm(\'' + item.id + '\', \'' + escapeHtmlForJs(item.topic) + '\', \'' + escapeHtmlForJs(item.memo || '') + '\')" class="text-lab-cyan hover:text-white transition drop-shadow-[0_0_5px_rgba(6,182,212,0.5)]" title="編集">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>' +
+          '</button>' +
           '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red hover:underline text-xs font-bold py-1 px-2">DEL</button>' +
           '</td>' +
           '</tr>'
@@ -1666,7 +1700,12 @@
           '<span class="text-[10px] text-lab-muted font-bold font-mono-lab">STATUS</span>' +
           statusHtml +
           '</div>' +
-          '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red bg-lab-red/10 border border-lab-red/50 hover:bg-lab-red hover:text-white rounded font-bold px-3 py-2 transition text-xs ml-2">削除</button>' +
+          '<div class="ml-auto flex items-center gap-2">' +
+          '<button onclick="openEditItemForm(\'' + item.id + '\', \'' + escapeHtmlForJs(item.topic) + '\', \'' + escapeHtmlForJs(item.memo || '') + '\')" class="text-lab-cyan bg-lab-cyan/10 border border-lab-cyan/50 hover:bg-lab-cyan hover:text-black rounded font-bold p-2 transition flex items-center justify-center shadow-[0_0_8px_rgba(6,182,212,0.2)]">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>' +
+          '</button>' +
+          '<button onclick="deleteItem(\'' + item.id + '\')" class="text-lab-red bg-lab-red/10 border border-lab-red/50 hover:bg-lab-red hover:text-white rounded font-bold px-3 py-2 transition text-xs">削除</button>' +
+          '</div>' +
           '</div>' +
           '</div>'
         );
@@ -1743,6 +1782,68 @@
         modal.classList.toggle('hidden');
         modal.classList.toggle('flex');
         if (!modal.classList.contains('hidden')) document.getElementById('cp-current').focus();
+      }
+    }
+    
+    function escapeHtmlForJs(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, '\\\'')
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '');
+    }
+
+    function toggleEditItemForm(show = true) {
+      const panel = document.getElementById('edit-item-form-panel');
+      if (show) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+      } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+      }
+    }
+
+    function openEditItemForm(id, topic, memo) {
+      document.getElementById('edit-input-id').value = id;
+      document.getElementById('edit-input-topic').value = topic;
+      document.getElementById('edit-input-memo').value = memo || '';
+      toggleEditItemForm(true);
+    }
+
+    async function handleEditItem(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-input-id').value;
+      const topic = document.getElementById('edit-input-topic').value.trim();
+      const memo = document.getElementById('edit-input-memo').value.trim();
+      if (!topic) return;
+
+      try {
+        const res = await fetch('/api/items/' + id, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + userToken
+          },
+          body: JSON.stringify({ topic, memo })
+        });
+        if (!res.ok) {
+          if (res.status === 401) throw new Error('Unauthorized');
+          throw new Error('API Error');
+        }
+        const data = await res.json();
+        // Update local state
+        const idx = itemsState.findIndex(i => i.id === data.item.id);
+        if (idx !== -1) itemsState[idx] = data.item;
+        
+        toggleEditItemForm(false);
+        if (currentView === 'history') renderManagementTable();
+        showSysToast('タスクを更新しました', 'success');
+      } catch (err) {
+        if (err.message === 'Unauthorized') logout();
+        else showSysToast('更新に失敗しました: ' + err.message, 'error');
       }
     }
 

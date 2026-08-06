@@ -261,6 +261,31 @@ app.post('/api/items', async (c) => {
   }
 });
 
+app.put('/api/items/:id', async (c) => {
+  const id = c.req.param('id');
+  const userId = c.get('userId');
+  try {
+    const body = await c.req.json();
+    const topic = body.topic?.trim();
+    const memo = body.memo ? body.memo.trim() : null;
+
+    if (!topic) {
+      return c.json({ error: 'Topic is required' }, 400);
+    }
+
+    const item = await c.env.DB.prepare('SELECT * FROM items WHERE id = ? AND user_id = ?').bind(id, userId).first<Item>();
+    if (!item) return c.json({ error: 'Item not found' }, 404);
+
+    await c.env.DB.prepare(
+      `UPDATE items SET topic = ?, memo = ? WHERE id = ? AND user_id = ?`
+    ).bind(topic, memo, id, userId).run();
+
+    const updatedItem = await c.env.DB.prepare('SELECT * FROM items WHERE id = ?').bind(id).first<Item>();
+    return c.json({ item: updatedItem });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
 app.put('/api/items/:id/review', async (c) => {
   const id = c.req.param('id');
   const userId = c.get('userId');
