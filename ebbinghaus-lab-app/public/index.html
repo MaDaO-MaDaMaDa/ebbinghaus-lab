@@ -517,37 +517,6 @@
         </button>
       </div>
 
-      <!-- Dashboard Actions -->
-      <div class="grid grid-cols-2 gap-2 md:gap-3 shrink-0">
-        <!-- New Task Button -->
-        <button onclick="switchView('history'); setTimeout(() => toggleAddItemForm(true), 100);"
-          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-cyan group rounded p-2 md:p-3 text-center transition-all flex flex-col items-center justify-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:-translate-y-1 active:translate-y-0">
-          <div class="absolute inset-0 bg-lab-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-lab-cyan/10 flex items-center justify-center text-lab-cyan group-hover:scale-110 group-hover:bg-lab-cyan/20 transition-all border border-lab-cyan/20">
-            <span class="text-xl md:text-2xl mb-0.5">+</span>
-          </div>
-          <div class="relative z-10 w-full">
-            <div class="text-[9px] font-bold text-lab-cyan font-mono-lab group-hover:text-cyan-300">[ACTION]</div>
-            <div class="text-xs md:text-sm font-bold text-white leading-tight break-words">新しい学習を記録</div>
-          </div>
-        </button>
-
-        <!-- Completed Tasks Button -->
-        <button onclick="openCompletedTasksModal()"
-          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-green group rounded p-2 md:p-3 text-center transition-all flex flex-col items-center justify-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:-translate-y-1 active:translate-y-0">
-          <div class="absolute inset-0 bg-lab-green/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-lab-green/10 flex items-center justify-center text-lab-green group-hover:scale-110 group-hover:bg-lab-green/20 transition-all border border-lab-green/20">
-            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
-            </svg>
-          </div>
-          <div class="relative z-10 w-full">
-            <div class="text-[9px] font-bold text-lab-green font-mono-lab group-hover:text-green-300">[ACTION]</div>
-            <div class="text-xs md:text-sm font-bold text-white leading-tight break-words">完了済タスク一覧</div>
-          </div>
-        </button>
-      </div>
-
       <!-- Top Metrics Banner -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 shrink-0">
 
@@ -582,6 +551,37 @@
           </div>
           <div class="absolute top-1 right-2 text-white/10 text-2xl md:text-3xl font-bold font-mono-lab">04</div>
         </div>
+      </div>
+
+      <!-- Dashboard Actions -->
+      <div class="grid grid-cols-2 gap-2 md:gap-3 shrink-0">
+        <!-- New Task Button -->
+        <button onclick="switchView('history'); setTimeout(() => toggleAddItemForm(true), 100);"
+          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-cyan group rounded p-2 md:p-3 text-center transition-all flex flex-col items-center justify-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:-translate-y-1 active:translate-y-0">
+          <div class="absolute inset-0 bg-lab-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-lab-cyan/10 flex items-center justify-center text-lab-cyan group-hover:scale-110 group-hover:bg-lab-cyan/20 transition-all border border-lab-cyan/20">
+            <span class="text-xl md:text-2xl mb-0.5">+</span>
+          </div>
+          <div class="relative z-10 w-full">
+            <div class="text-[9px] font-bold text-lab-cyan font-mono-lab group-hover:text-cyan-300">[ACTION]</div>
+            <div class="text-xs md:text-sm font-bold text-white leading-tight break-words">新しい学習を記録</div>
+          </div>
+        </button>
+
+        <!-- Completed Tasks Button -->
+        <button onclick="openCompletedTasksModal()"
+          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-green group rounded p-2 md:p-3 text-center transition-all flex flex-col items-center justify-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:-translate-y-1 active:translate-y-0">
+          <div class="absolute inset-0 bg-lab-green/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-lab-green/10 flex items-center justify-center text-lab-green group-hover:scale-110 group-hover:bg-lab-green/20 transition-all border border-lab-green/20">
+            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+          <div class="relative z-10 w-full">
+            <div class="text-[9px] font-bold text-lab-green font-mono-lab group-hover:text-green-300">[ACTION]</div>
+            <div class="text-xs md:text-sm font-bold text-white leading-tight break-words">完了済タスク一覧</div>
+          </div>
+        </button>
       </div>
       <!-- Completed Tasks Modal -->
       <div id="completed-tasks-modal" class="hidden fixed inset-0 z-[100] items-center justify-center p-4">
