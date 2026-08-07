@@ -1361,7 +1361,12 @@
         });
         const data = await safeParseJson(res);
         if (!res.ok) throw new Error(data.error || 'Cron failed');
-        showToast('Cron実行成功');
+        
+        if (data.logs && data.logs.length > 0) {
+          alert("Cron Logs:\n\n" + data.logs.join('\n'));
+        } else {
+          showToast('Cron実行成功 (No logs returned)');
+        }
       } catch (err) {
         showCustomModal({ title: 'Error', message: err.message, confirmText: 'OK' });
       }

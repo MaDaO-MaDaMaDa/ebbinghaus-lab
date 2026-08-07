@@ -481,9 +481,15 @@ async function sendWebPush(subscription: any, env: Bindings) {
   }
 }
 
-async function triggerCron(env: Bindings) {
+async function triggerCron(env: Bindings): Promise<string[]> {
+  const logs: string[] = [];
+  const addLog = (msg: string) => {
+    console.log(msg);
+    logs.push(msg);
+  };
+
   const now = formatDateTime(new Date());
-  console.log(`[CRON START] Executed at ${now}`);
+  addLog(`[CRON START] Executed at ${now}`);
 
   try {
     const { results: dueItems } = await env.DB.prepare(
@@ -495,27 +501,27 @@ async function triggerCron(env: Bindings) {
             OR datetime(last_notified_at, '+20 minutes') <= ?)`
     ).bind(now, now).all();
 
-    console.log(`[CRON QUERY] dueItems found: ${dueItems ? dueItems.length : 0}`);
+    addLog(`[CRON QUERY] dueItems found: ${dueItems ? dueItems.length : 0}`);
 
     if (!dueItems || dueItems.length === 0) {
-      console.log(`[CRON END] No due items. Exiting.`);
-      return;
+      addLog(`[CRON END] No due items. Exiting.`);
+      return logs;
     }
 
     const dueUserIds = dueItems.map(item => (item as any).user_id);
     const placeholders = dueUserIds.map(() => '?').join(',');
     
-    console.log(`[CRON] dueUserIds: ${JSON.stringify(dueUserIds)}`);
+    addLog(`[CRON] dueUserIds: ${JSON.stringify(dueUserIds)}`);
 
     const { results: subscriptions } = await env.DB.prepare(
       `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
     ).bind(...dueUserIds).all();
 
-    console.log(`[CRON] subscriptions found: ${subscriptions ? subscriptions.length : 0}`);
+    addLog(`[CRON] subscriptions found: ${subscriptions ? subscriptions.length : 0}`);
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log(`[CRON END] Users have due items but no push subscriptions.`);
-      return;
+      addLog(`[CRON END] Users have due items but no push subscriptions.`);
+      return logs;
     }
 
     let successCount = 0;
@@ -524,13 +530,13 @@ async function triggerCron(env: Bindings) {
         const success = await sendWebPush(sub, env);
         if (success) successCount++;
         // Use any cast since sub is from DB
-        console.log(`[CRON PUSH] Sent to endpoint ${(sub as any).endpoint?.substring(0, 30)}... Success: ${success}`);
+        addLog(`[CRON PUSH] Sent to endpoint ${(sub as any).endpoint?.substring(0, 30)}... Success: ${success}`);
       } catch (pushErr) {
-        console.error(`[CRON PUSH ERROR] Failed to send push:`, pushErr);
+        addLog(`[CRON PUSH ERROR] Failed to send push: ${pushErr}`);
       }
     }
 
-    console.log(`[CRON] Total push sent successfully: ${successCount} / ${subscriptions.length}`);
+    addLog(`[CRON] Total push sent successfully: ${successCount} / ${subscriptions.length}`);
 
     // Update last_notified_at for the due items so we don't notify again until their next review or 20 minutes passes
     const updateRes = await env.DB.prepare(
@@ -542,16 +548,17 @@ async function triggerCron(env: Bindings) {
             OR datetime(last_notified_at, '+20 minutes') <= ?)`
     ).bind(now, now, now).run();
 
-    console.log(`[CRON END] Items updated. Success: ${updateRes.success}`);
+    addLog(`[CRON END] Items updated. Success: ${updateRes.success}`);
 
   } catch (err) {
-    console.error(`[CRON ERROR] Fatal error in triggerCron:`, err);
+    addLog(`[CRON ERROR] Fatal error in triggerCron: ${err}`);
   }
+  return logs;
 }
 
 app.get('/api/cron/trigger', async (c) => {
-  await triggerCron(c.env);
-  return c.json({ success: true, message: 'Cron logic triggered manually for testing.' });
+  const logs = await triggerCron(c.env);
+  return c.json({ success: true, message: 'Cron logic triggered manually for testing.', logs });
 });
 
 app.post('/api/debug/push-test', async (c) => {
