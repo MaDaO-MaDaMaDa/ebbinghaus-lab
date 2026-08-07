@@ -1363,7 +1363,8 @@
         if (!res.ok) throw new Error(data.error || 'Cron failed');
         
         if (data.logs && data.logs.length > 0) {
-          alert("Cron Logs:\n\n" + data.logs.join('\n'));
+          const logHtml = `<div class="bg-[#0a0a0a] text-[#00ffcc] font-mono-lab p-3 rounded text-xs text-left overflow-y-auto max-h-64 border border-lab-cyan whitespace-pre-wrap shadow-[inset_0_0_10px_rgba(0,255,204,0.1)] mt-2">${data.logs.join('\n')}</div>`;
+          showCustomModal({ title: 'CRON LOGS', message: logHtml, confirmText: '閉じる' });
         } else {
           showToast('Cron実行成功 (No logs returned)');
         }
