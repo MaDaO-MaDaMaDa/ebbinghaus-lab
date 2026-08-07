@@ -306,10 +306,10 @@
     </section>
 
     <!-- ==================== 01. DASHBOARD VIEW ==================== -->
-    <section id="view-dashboard" class="hidden flex-col flex-1 min-h-0 gap-4 md:gap-6 overflow-y-auto overflow-x-hidden">
+    <section id="view-dashboard" class="hidden flex-col flex-1 min-h-0 gap-2 md:gap-3 overflow-y-auto overflow-x-hidden">
 
       <!-- Animated Forgetting Curve -->
-      <div onclick="showEbbinghausExplanation()" class="lab-panel p-3 md:p-8 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-none md:h-1/2 flex flex-col">
+      <div onclick="showEbbinghausExplanation()" class="lab-panel p-2 md:p-4 rounded relative overflow-hidden border-t-2 border-t-lab-cyan shadow-xl cursor-pointer flex-none md:h-[45%] flex flex-col">
         <div class="w-full flex-1 relative flex items-center justify-center min-h-0">
           <svg id="ebbinghaus-svg" viewBox="30 -5 920 530" class="w-full h-auto md:w-full md:h-full drop-shadow-lg" preserveAspectRatio="xMidYMid meet" style="display:block; max-height: 100%;">
             <defs>
@@ -499,86 +499,89 @@
         </div>
       </div>
 
-      <!-- Top Metrics Banner -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 shrink-0">
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] md:text-xs text-lab-muted font-bold font-mono-lab">REVIEWS_DUE</div>
-          <div class="text-2xl md:text-3xl font-bold text-lab-yellow mt-1 md:mt-2 font-mono-lab" id="metric-due-count">0</div>
-          <div class="text-[9px] md:text-[10px] text-lab-muted mt-1 font-bold">本日復習すべき項目</div>
-          <div class="absolute top-2 right-2 text-lab-yellow/20 text-3xl md:text-4xl font-bold font-mono-lab">01</div>
-        </div>
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] md:text-xs text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
-          <div class="text-2xl md:text-3xl font-bold text-lab-cyan mt-1 md:mt-2 font-mono-lab" id="metric-active-count">0</div>
-          <div class="text-[9px] md:text-[10px] text-lab-muted mt-1 font-bold">学習進行中</div>
-          <div class="absolute top-2 right-2 text-lab-cyan/20 text-3xl md:text-4xl font-bold font-mono-lab">02</div>
-        </div>
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] md:text-xs text-lab-muted font-bold font-mono-lab">COMPLETED</div>
-          <div class="text-2xl md:text-3xl font-bold text-lab-green mt-1 md:mt-2 font-mono-lab" id="metric-completed-count">0</div>
-          <div class="text-[9px] md:text-[10px] text-lab-muted mt-1 font-bold">目標達成済み</div>
-          <div class="absolute top-2 right-2 text-lab-green/20 text-3xl md:text-4xl font-bold font-mono-lab">03</div>
-        </div>
-
-        <div class="lab-panel p-3 rounded relative overflow-hidden">
-          <div class="text-[10px] md:text-xs text-lab-muted font-bold font-mono-lab">AVG_STRENGTH</div>
-          <div class="text-2xl md:text-3xl font-bold text-white mt-1 md:mt-2 font-mono-lab" id="metric-avg-strength">0.0%</div>
-          <div class="w-full bg-lab-border rounded-full h-1.5 mt-2 overflow-hidden">
-            <div id="metric-strength-bar" class="bg-white h-full w-0 transition-all duration-500"></div>
-          </div>
-          <div class="absolute top-2 right-2 text-white/10 text-3xl md:text-4xl font-bold font-mono-lab">04</div>
-        </div>
-      </div>
-
       <!-- 復習タスク通知バナー -->
-      <div id="dashboard-review-alert" class="hidden shrink-0 lab-panel p-4 rounded border-l-4 border-lab-pink bg-lab-pink/10 relative overflow-hidden items-center justify-between cursor-pointer shadow-[0_0_15px_rgba(255,45,170,0.15)] transition-all hover:bg-lab-pink/20" onclick="switchView('reviews')">
+      <div id="dashboard-review-alert" class="hidden shrink-0 lab-panel p-2 md:p-3 rounded border-l-4 border-lab-pink bg-lab-pink/10 relative overflow-hidden items-center justify-between cursor-pointer shadow-[0_0_15px_rgba(255,45,170,0.15)] transition-all hover:bg-lab-pink/20" onclick="switchView('reviews')">
         <div class="flex items-center gap-3">
           <div class="text-lab-pink animate-pulse">
-            <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
           </div>
           <div>
             <div class="text-[10px] font-bold text-lab-pink font-mono-lab tracking-widest">[ACTION_REQUIRED]</div>
-            <div class="text-xs md:text-sm font-bold text-white mt-0.5">復習のタイミングが来ているタスクが <span id="dashboard-alert-count" class="text-lab-pink text-lg font-mono-lab px-1">0</span> 件あります！</div>
+            <div class="text-xs md:text-sm font-bold text-white mt-0.5">復習のタイミングが来ているタスクが <span id="dashboard-alert-count" class="text-lab-pink text-base font-mono-lab px-1">0</span> 件あります！</div>
           </div>
         </div>
-        <button class="bg-lab-pink text-black font-bold px-4 py-2 rounded text-xs whitespace-nowrap hidden sm:block shadow-[0_0_10px_rgba(255,45,170,0.4)]">
+        <button class="bg-lab-pink text-black font-bold px-3 py-1.5 rounded text-xs whitespace-nowrap hidden sm:block shadow-[0_0_10px_rgba(255,45,170,0.4)]">
           今すぐ復習
         </button>
       </div>
+
       <!-- Dashboard Actions -->
-      <div class="grid grid-cols-2 gap-3 md:gap-4 shrink-0">
+      <div class="grid grid-cols-2 gap-2 md:gap-3 shrink-0">
         <!-- New Task Button -->
         <button onclick="switchView('history'); setTimeout(() => toggleAddItemForm(true), 100);"
-          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-cyan group rounded-xl p-3 md:p-4 text-center transition-all flex flex-col items-center justify-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:-translate-y-1 active:translate-y-0">
+          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-cyan group rounded p-2 md:p-3 text-center transition-all flex flex-col items-center justify-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:-translate-y-1 active:translate-y-0">
           <div class="absolute inset-0 bg-lab-cyan/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-lab-cyan/10 flex items-center justify-center text-lab-cyan group-hover:scale-110 group-hover:bg-lab-cyan/20 transition-all border border-lab-cyan/20">
-            <span class="text-2xl md:text-3xl mb-0.5">+</span>
+          <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-lab-cyan/10 flex items-center justify-center text-lab-cyan group-hover:scale-110 group-hover:bg-lab-cyan/20 transition-all border border-lab-cyan/20">
+            <span class="text-xl md:text-2xl mb-0.5">+</span>
           </div>
           <div class="relative z-10 w-full">
-            <div class="text-[9px] md:text-xs font-bold text-lab-cyan font-mono-lab mb-0.5 group-hover:text-cyan-300">[ACTION]</div>
-            <div class="text-xs md:text-base font-bold text-white leading-tight break-words">新しい学習を記録</div>
+            <div class="text-[9px] font-bold text-lab-cyan font-mono-lab group-hover:text-cyan-300">[ACTION]</div>
+            <div class="text-xs md:text-sm font-bold text-white leading-tight break-words">新しい学習を記録</div>
           </div>
         </button>
 
         <!-- Completed Tasks Button -->
         <button onclick="openCompletedTasksModal()"
-          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-green group rounded-xl p-3 md:p-4 text-center transition-all flex flex-col items-center justify-center gap-2 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:-translate-y-1 active:translate-y-0">
+          class="relative overflow-hidden bg-gradient-to-b from-lab-panel to-black/50 border border-lab-border hover:border-lab-green group rounded p-2 md:p-3 text-center transition-all flex flex-col items-center justify-center gap-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:-translate-y-1 active:translate-y-0">
           <div class="absolute inset-0 bg-lab-green/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-lab-green/10 flex items-center justify-center text-lab-green group-hover:scale-110 group-hover:bg-lab-green/20 transition-all border border-lab-green/20">
-            <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-lab-green/10 flex items-center justify-center text-lab-green group-hover:scale-110 group-hover:bg-lab-green/20 transition-all border border-lab-green/20">
+            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
             </svg>
           </div>
           <div class="relative z-10 w-full">
-            <div class="text-[9px] md:text-xs font-bold text-lab-green font-mono-lab mb-0.5 group-hover:text-green-300">[ACTION]</div>
-            <div class="text-xs md:text-base font-bold text-white leading-tight break-words">完了済タスク一覧</div>
+            <div class="text-[9px] font-bold text-lab-green font-mono-lab group-hover:text-green-300">[ACTION]</div>
+            <div class="text-xs md:text-sm font-bold text-white leading-tight break-words">完了済タスク一覧</div>
           </div>
         </button>
+      </div>
+
+      <!-- Top Metrics Banner -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 shrink-0">
+
+        <div class="lab-panel p-2 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">REVIEWS_DUE</div>
+          <div class="text-xl md:text-2xl font-bold text-lab-yellow font-mono-lab" id="metric-due-count">0</div>
+          <div class="text-[9px] text-lab-muted font-bold">本日復習すべき項目</div>
+          <div class="absolute top-1 right-2 text-lab-yellow/20 text-2xl md:text-3xl font-bold font-mono-lab">01</div>
+        </div>
+
+        <div class="lab-panel p-2 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">ACTIVE_LOGS</div>
+          <div class="text-xl md:text-2xl font-bold text-lab-cyan font-mono-lab" id="metric-active-count">0</div>
+          <div class="text-[9px] text-lab-muted font-bold">学習進行中</div>
+          <div class="absolute top-1 right-2 text-lab-cyan/20 text-2xl md:text-3xl font-bold font-mono-lab">02</div>
+        </div>
+
+        <div class="lab-panel p-2 rounded relative overflow-hidden">
+          <div class="text-[10px] text-lab-muted font-bold font-mono-lab">COMPLETED</div>
+          <div class="text-xl md:text-2xl font-bold text-lab-green font-mono-lab" id="metric-completed-count">0</div>
+          <div class="text-[9px] text-lab-muted font-bold">目標達成済み</div>
+          <div class="absolute top-1 right-2 text-lab-green/20 text-2xl md:text-3xl font-bold font-mono-lab">03</div>
+        </div>
+
+        <div class="lab-panel p-2 rounded relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div class="text-[10px] text-lab-muted font-bold font-mono-lab">AVG_STRENGTH</div>
+            <div class="text-xl md:text-2xl font-bold text-white font-mono-lab" id="metric-avg-strength">0.0%</div>
+          </div>
+          <div class="w-full bg-lab-border rounded-full h-1 mt-1 overflow-hidden">
+            <div id="metric-strength-bar" class="bg-white h-full w-0 transition-all duration-500"></div>
+          </div>
+          <div class="absolute top-1 right-2 text-white/10 text-2xl md:text-3xl font-bold font-mono-lab">04</div>
+        </div>
       </div>
       <!-- Completed Tasks Modal -->
       <div id="completed-tasks-modal" class="hidden fixed inset-0 z-[100] items-center justify-center p-4">
