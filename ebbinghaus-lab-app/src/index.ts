@@ -483,38 +483,70 @@ async function sendWebPush(subscription: any, env: Bindings) {
 
 async function triggerCron(env: Bindings) {
   const now = formatDateTime(new Date());
-  const { results: dueItems } = await env.DB.prepare(
-    `SELECT DISTINCT user_id FROM items 
-     WHERE is_completed = 0 
-     AND next_review_due <= ? 
-     AND (last_notified_at IS NULL 
-          OR last_notified_at < next_review_due 
-          OR datetime(last_notified_at, '+20 minutes') <= ?)`
-  ).bind(now, now).all();
+  console.log(`[CRON START] Executed at ${now}`);
 
-  if (!dueItems || dueItems.length === 0) return;
+  try {
+    const { results: dueItems } = await env.DB.prepare(
+      `SELECT DISTINCT user_id FROM items 
+       WHERE is_completed = 0 
+       AND next_review_due <= ? 
+       AND (last_notified_at IS NULL 
+            OR last_notified_at < next_review_due 
+            OR datetime(last_notified_at, '+20 minutes') <= ?)`
+    ).bind(now, now).all();
 
-  const dueUserIds = dueItems.map(item => (item as any).user_id);
-  const placeholders = dueUserIds.map(() => '?').join(',');
-  const { results: subscriptions } = await env.DB.prepare(
-    `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
-  ).bind(...dueUserIds).all();
+    console.log(`[CRON QUERY] dueItems found: ${dueItems ? dueItems.length : 0}`);
 
-  if (!subscriptions) return;
+    if (!dueItems || dueItems.length === 0) {
+      console.log(`[CRON END] No due items. Exiting.`);
+      return;
+    }
 
-  for (const sub of subscriptions) {
-    await sendWebPush(sub, env);
+    const dueUserIds = dueItems.map(item => (item as any).user_id);
+    const placeholders = dueUserIds.map(() => '?').join(',');
+    
+    console.log(`[CRON] dueUserIds: ${JSON.stringify(dueUserIds)}`);
+
+    const { results: subscriptions } = await env.DB.prepare(
+      `SELECT * FROM subscriptions WHERE user_id IN (${placeholders})`
+    ).bind(...dueUserIds).all();
+
+    console.log(`[CRON] subscriptions found: ${subscriptions ? subscriptions.length : 0}`);
+
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log(`[CRON END] Users have due items but no push subscriptions.`);
+      return;
+    }
+
+    let successCount = 0;
+    for (const sub of subscriptions) {
+      try {
+        const success = await sendWebPush(sub, env);
+        if (success) successCount++;
+        // Use any cast since sub is from DB
+        console.log(`[CRON PUSH] Sent to endpoint ${(sub as any).endpoint?.substring(0, 30)}... Success: ${success}`);
+      } catch (pushErr) {
+        console.error(`[CRON PUSH ERROR] Failed to send push:`, pushErr);
+      }
+    }
+
+    console.log(`[CRON] Total push sent successfully: ${successCount} / ${subscriptions.length}`);
+
+    // Update last_notified_at for the due items so we don't notify again until their next review or 20 minutes passes
+    const updateRes = await env.DB.prepare(
+      `UPDATE items SET last_notified_at = ? 
+       WHERE is_completed = 0 
+       AND next_review_due <= ? 
+       AND (last_notified_at IS NULL 
+            OR last_notified_at < next_review_due 
+            OR datetime(last_notified_at, '+20 minutes') <= ?)`
+    ).bind(now, now, now).run();
+
+    console.log(`[CRON END] Items updated. Success: ${updateRes.success}`);
+
+  } catch (err) {
+    console.error(`[CRON ERROR] Fatal error in triggerCron:`, err);
   }
-
-  // Update last_notified_at for the due items so we don't notify again until their next review or 20 minutes passes
-  await env.DB.prepare(
-    `UPDATE items SET last_notified_at = ? 
-     WHERE is_completed = 0 
-     AND next_review_due <= ? 
-     AND (last_notified_at IS NULL 
-          OR last_notified_at < next_review_due 
-          OR datetime(last_notified_at, '+20 minutes') <= ?)`
-  ).bind(now, now, now).run();
 }
 
 app.get('/api/cron/trigger', async (c) => {
@@ -559,6 +591,7 @@ export const honoApp = app;
 export default {
   fetch: app.fetch,
   scheduled: async (event: any, env: Bindings, ctx: any) => {
+    console.log(`[CRON TRIGGERED BY CLOUDFLARE] cron type: ${event?.cron}, scheduledTime: ${event?.scheduledTime}`);
     ctx.waitUntil(triggerCron(env));
   }
 };
