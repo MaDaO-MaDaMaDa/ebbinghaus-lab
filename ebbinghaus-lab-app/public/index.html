@@ -784,10 +784,11 @@
         </div>
 
         <!-- NOTIFICATION SETTINGS -->
-        <div class="pt-6 border-t border-lab-border/50">
+        <div class="pt-6 border-t border-lab-border/50 space-y-3">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-md font-bold text-white">復習タイミングの通知</h3>
+              <p class="text-xs text-lab-muted mt-0.5">復習時間になると端末に直接通知します</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="notification-toggle" class="sr-only peer"
@@ -796,6 +797,12 @@
                 class="w-11 h-6 bg-lab-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-lab-muted after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-lab-cyan peer-checked:after:bg-white">
               </div>
             </label>
+          </div>
+          <div>
+            <button onclick="testPushNotification()" type="button"
+              class="text-xs bg-lab-panel border border-lab-cyan/60 hover:border-lab-cyan text-lab-cyan hover:bg-lab-cyan hover:text-black px-3 py-1.5 rounded transition font-bold">
+              🔔 今すぐテスト通知を試す
+            </button>
           </div>
         </div>
 
@@ -1022,8 +1029,28 @@
     // ==========================================
     // CAPACITOR LOCAL NOTIFICATIONS HELPERS
     // ==========================================
+    const NOTIFICATION_CHANNEL_ID = 'ebbinghaus_reviews';
+
     function getLocalNotificationsPlugin() {
       return window.Capacitor?.Plugins?.LocalNotifications;
+    }
+
+    async function ensureNotificationChannel() {
+      const LN = getLocalNotificationsPlugin();
+      if (!LN || !LN.createChannel) return;
+      try {
+        await LN.createChannel({
+          id: NOTIFICATION_CHANNEL_ID,
+          name: '復習リマインダー',
+          description: 'エビングハウスの忘却曲線に基づく復習タイミングをお知らせします',
+          importance: 5, // MAX: ポップアップ・音・バイブレーション
+          visibility: 1, // PUBLIC: ロック画面にも表示
+          vibration: true
+        });
+        console.log('[LocalNotifications] Notification channel ensured');
+      } catch (e) {
+        console.warn('[LocalNotifications] createChannel error:', e);
+      }
     }
 
     function hashStringToInt(str) {
@@ -1040,6 +1067,7 @@
       const LN = getLocalNotificationsPlugin();
       if (LN) {
         try {
+          await ensureNotificationChannel();
           const check = await LN.checkPermissions();
           if (check?.display === 'granted') return true;
           const res = await LN.requestPermissions();
@@ -1065,13 +1093,16 @@
         try {
           const hasPerm = await requestAppNotificationPermission();
           if (hasPerm) {
+            await ensureNotificationChannel();
             await LN.schedule({
               notifications: [
                 {
                   id: Math.floor(Math.random() * 899999) + 100000,
                   title: title,
                   body: body,
-                  smallIcon: 'ic_launcher'
+                  channelId: NOTIFICATION_CHANNEL_ID,
+                  smallIcon: 'ic_launcher',
+                  schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true }
                 }
               ]
             });
@@ -1102,15 +1133,24 @@
       }
     }
 
+    let lastDueAlertTimestamp = 0;
+
     async function syncLocalNotificationSchedules() {
       if (!currentUser) return;
       const prefKey = 'notifications_enabled_' + currentUser.username;
-      const isEnabled = localStorage.getItem(prefKey) === 'true';
+      const localPref = localStorage.getItem(prefKey);
+      // 未設定(null)の場合はデフォルトでON (true)
+      const isEnabled = localPref === null ? true : localPref === 'true';
+      if (localPref === null) {
+        localStorage.setItem(prefKey, 'true');
+      }
 
       const LN = getLocalNotificationsPlugin();
       if (!LN) return;
 
       try {
+        await ensureNotificationChannel();
+
         // 通知がオフの場合は保留中スケジュールを全削除
         if (!isEnabled) {
           const pending = await LN.getPending();
@@ -1122,7 +1162,10 @@
         }
 
         const hasPerm = await requestAppNotificationPermission();
-        if (!hasPerm) return;
+        if (!hasPerm) {
+          console.warn('[LocalNotifications] Permission not granted');
+          return;
+        }
 
         // 既存の保留中スケジュールをクリア
         const pending = await LN.getPending();
@@ -1136,27 +1179,58 @@
 
         const activeItems = (itemsState || []).filter(item => item.is_completed === 0 && item.next_review_due);
 
+        // 1. 未来の復習タスクをスケジュール
         activeItems.forEach((item, index) => {
           const dueStr = String(item.next_review_due);
           const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
           const dueDate = new Date(dueStrUtc);
 
-          // 未来の予定時刻のみ登録
           if (dueDate.getTime() > nowMs) {
             const notifId = (hashStringToInt(`ebbinghaus_item_${item.id}`) % 900000) + 100000;
             scheduledNotifications.push({
               id: notifId,
               title: "エビングハウス・ラボ",
               body: `復習の時間です: 「${item.topic || item.title || '学習項目'}」`,
-              schedule: { at: dueDate },
+              channelId: NOTIFICATION_CHANNEL_ID,
+              schedule: { at: dueDate, allowWhileIdle: true },
               smallIcon: 'ic_launcher'
             });
           }
         });
 
+        // 2. すでに期限が来ている（DUE）未完了タスクの処理
+        const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
+        if (dueItems.length > 0) {
+          // 直近20分以内に通知していなければ即時通知を鳴らす
+          if (nowMs - lastDueAlertTimestamp > 20 * 60 * 1000) {
+            lastDueAlertTimestamp = nowMs;
+            const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
+            const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
+            sendAppNotification("エビングハウス・ラボ", `復習のタイミングが来ているタスクが ${dueItems.length} 件あります！（${taskTopics}${more}）`);
+          }
+
+          // アプリを閉じた後も気づけるよう、未完了タスクがある場合は1時間後・3時間後にリマインド通知を登録
+          scheduledNotifications.push({
+            id: 999101,
+            title: "エビングハウス・ラボ",
+            body: `未復習のタスクが ${dueItems.length} 件あります。記憶の定着のために復習しましょう！`,
+            channelId: NOTIFICATION_CHANNEL_ID,
+            schedule: { at: new Date(nowMs + 60 * 60 * 1000), allowWhileIdle: true },
+            smallIcon: 'ic_launcher'
+          });
+          scheduledNotifications.push({
+            id: 999102,
+            title: "エビングハウス・ラボ",
+            body: `未復習のタスクが残っています。少しの復習で記憶が蘇ります。`,
+            channelId: NOTIFICATION_CHANNEL_ID,
+            schedule: { at: new Date(nowMs + 3 * 60 * 60 * 1000), allowWhileIdle: true },
+            smallIcon: 'ic_launcher'
+          });
+        }
+
         if (scheduledNotifications.length > 0) {
           await LN.schedule({ notifications: scheduledNotifications });
-          console.log(`[LocalNotifications] ${scheduledNotifications.length} 件の復習通知を端末にスケジュールしました。`);
+          console.log(`[LocalNotifications] ${scheduledNotifications.length} 件の通知を端末にスケジュールしました。`);
         }
       } catch (err) {
         console.warn('[LocalNotifications] スケジュール登録失敗:', err);
@@ -1189,6 +1263,15 @@
           if (state.isActive && userToken) {
             fetchItems();
           }
+        });
+      }
+
+      // 通知をタップした時に復習画面を開く
+      const LN = getLocalNotificationsPlugin();
+      if (LN && LN.addListener) {
+        LN.addListener('localNotificationActionPerformed', (action) => {
+          console.log('[LocalNotifications] User tapped notification:', action);
+          switchView('reviews');
         });
       }
     });
@@ -1288,10 +1371,18 @@
           const prefKey = 'notifications_enabled_' + currentUser.username;
           const localPref = localStorage.getItem(prefKey);
 
-          if (localPref === 'true') {
+          if (localPref === 'false') {
+            if (toggle) toggle.checked = false;
+          } else {
+            // 未設定またはtrueの場合はデフォルトでON
             if (toggle) toggle.checked = true;
-            // Silent resubscription if needed
-            if ("Notification" in window && Notification.permission === 'granted' && navigator.serviceWorker) {
+            localStorage.setItem(prefKey, 'true');
+            // ネイティブアプリの場合はパーミッション要求とチャンネル作成を即座に試行
+            ensureNotificationChannel().then(() => {
+              requestAppNotificationPermission().catch(console.warn);
+            });
+            // Web Pushの場合のサイレント再購読
+            if ("Notification" in window && Notification.permission === 'granted' && navigator.serviceWorker && !window.Capacitor?.isNativePlatform?.()) {
               navigator.serviceWorker.ready.then(async sw => {
                 let sub = await sw.pushManager.getSubscription();
                 if (!sub) {
@@ -1312,14 +1403,6 @@
                   });
                 }
               }).catch(err => console.error('Silent sub error:', err));
-            }
-          } else if (localPref === 'false') {
-            if (toggle) toggle.checked = false;
-          } else {
-            // Fallback to backend status if not set locally
-            if (statusRes.ok && statusData.subscribed !== undefined) {
-              if (toggle) toggle.checked = statusData.subscribed;
-              localStorage.setItem(prefKey, statusData.subscribed ? 'true' : 'false');
             }
           }
         } catch (e) {
@@ -1545,9 +1628,19 @@
       try {
         const LN = getLocalNotificationsPlugin();
         if (LN) {
-          showToast('テスト通知を送信中...');
-          await sendAppNotification('【テスト通知】エビングハウス・ラボ', '通知が正常に動作しています！復習タイミングにもお知らせが届きます。');
-          showToast('テスト通知を端末に送信しました');
+          showToast('通知権限・チャンネルを確認中...');
+          await ensureNotificationChannel();
+          const hasPerm = await requestAppNotificationPermission();
+          if (!hasPerm) {
+            showCustomModal({
+              title: '通知の許可が必要です',
+              message: '端末の「設定」>「アプリ」>「Ebbinghaus Lab」で通知の送信を許可してください。',
+              confirmText: '確認'
+            });
+            return;
+          }
+          await sendAppNotification('【テスト通知】エビングハウス・ラボ', '通知は正常に機能しています！復習タイミングにもこのように届きます。');
+          showToast('🔔 テスト通知を送信しました！通知バーをご確認ください。');
           return;
         }
         showToast('テスト通知を送信中...');

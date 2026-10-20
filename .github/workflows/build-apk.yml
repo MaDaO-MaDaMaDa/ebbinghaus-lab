@@ -47,8 +47,12 @@ jobs:
           pip install pillow
           python3 scripts/generate-icons.py
 
-      - name: Configure Android Permissions
+      - name: Configure Android SDK and Permissions
         run: |
+          if [ -f "android/variables.gradle" ]; then
+            sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 26/g' android/variables.gradle
+          fi
+
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
             if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST_FILE"; then
