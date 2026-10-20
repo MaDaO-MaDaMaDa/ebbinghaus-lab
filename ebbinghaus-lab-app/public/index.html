@@ -788,7 +788,7 @@
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-md font-bold text-white">復習タイミングの通知</h3>
-              <p class="text-xs text-lab-muted mt-0.5">復習時間になると端末に直接通知します</p>
+              <p class="text-xs text-lab-muted mt-0.5">復習時間になると端末に通知します（未完了時は30分ごとにスヌーズ）</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="notification-toggle" class="sr-only peer"
@@ -1220,7 +1220,7 @@
           const dueDate = new Date(dueStrUtc);
 
           if (dueDate.getTime() > nowMs) {
-            const notifId = (hashStringToInt(`ebbinghaus_item_${item.id}`) % 900000) + 100000;
+            const notifId = (hashStringToInt(`ebbinghaus_item_${item.id}`) % 800000) + 100000;
             scheduledNotifications.push({
               id: notifId,
               title: "エビングハウス・ラボ",
@@ -1229,37 +1229,50 @@
               schedule: { at: dueDate, allowWhileIdle: true },
               smallIcon: 'ic_launcher'
             });
+
+            // 予定時刻後も復習されない場合に備え、+30分後・+60分後・+90分後のスヌーズをあらかじめスケジュール
+            if (index < 5) { // 端末リソースを考慮し直近5件に適用
+              for (let step = 1; step <= 3; step++) {
+                const snoozeTime = new Date(dueDate.getTime() + step * 30 * 60 * 1000);
+                const snoozeId = (hashStringToInt(`ebbinghaus_item_${item.id}_snooze_${step}`) % 800000) + 100000;
+                scheduledNotifications.push({
+                  id: snoozeId,
+                  title: "エビングハウス・ラボ",
+                  body: `【スヌーズ】復習の時間です: 「${item.topic || item.title || '学習項目'}」`,
+                  channelId: NOTIFICATION_CHANNEL_ID,
+                  schedule: { at: snoozeTime, allowWhileIdle: true },
+                  smallIcon: 'ic_launcher'
+                });
+              }
+            }
           }
         });
 
         // 2. すでに期限が来ている（DUE）未完了タスクの処理
         const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
         if (dueItems.length > 0) {
-          // 直近20分以内に通知していなければ即時通知を鳴らす
-          if (nowMs - lastDueAlertTimestamp > 20 * 60 * 1000) {
+          // 直近30分以内に通知していなければ即時通知を鳴らす
+          if (nowMs - lastDueAlertTimestamp > 30 * 60 * 1000) {
             lastDueAlertTimestamp = nowMs;
             const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
             const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
             sendAppNotification("エビングハウス・ラボ", `復習のタイミングが来ているタスクが ${dueItems.length} 件あります！（${taskTopics}${more}）`);
           }
 
-          // アプリを閉じた後も気づけるよう、未完了タスクがある場合は1時間後・3時間後にリマインド通知を登録
-          scheduledNotifications.push({
-            id: 999101,
-            title: "エビングハウス・ラボ",
-            body: `未復習のタスクが ${dueItems.length} 件あります。記憶の定着のために復習しましょう！`,
-            channelId: NOTIFICATION_CHANNEL_ID,
-            schedule: { at: new Date(nowMs + 60 * 60 * 1000), allowWhileIdle: true },
-            smallIcon: 'ic_launcher'
-          });
-          scheduledNotifications.push({
-            id: 999102,
-            title: "エビングハウス・ラボ",
-            body: `未復習のタスクが残っています。少しの復習で記憶が蘇ります。`,
-            channelId: NOTIFICATION_CHANNEL_ID,
-            schedule: { at: new Date(nowMs + 3 * 60 * 60 * 1000), allowWhileIdle: true },
-            smallIcon: 'ic_launcher'
-          });
+          // アプリを閉じた状態でも定期的に通知されるよう、30分ごとにスヌーズ通知をスケジュール（最大8回 = 4時間分）
+          const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
+          const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
+          for (let step = 1; step <= 8; step++) {
+            const snoozeDelayMs = step * 30 * 60 * 1000;
+            scheduledNotifications.push({
+              id: 999200 + step,
+              title: "エビングハウス・ラボ",
+              body: `【スヌーズ】復習待ちのタスクが ${dueItems.length} 件あります（${taskTopics}${more}）。記憶が薄れる前に復習しましょう！`,
+              channelId: NOTIFICATION_CHANNEL_ID,
+              schedule: { at: new Date(nowMs + snoozeDelayMs), allowWhileIdle: true },
+              smallIcon: 'ic_launcher'
+            });
+          }
         }
 
         if (scheduledNotifications.length > 0) {
@@ -1909,32 +1922,56 @@
         nextReviewTimer = null;
       }
       
-      const activeItems = itemsState.filter(item => item.is_completed === 0 && item.next_review_due);
-      if (activeItems.length === 0) return;
-
       const now = new Date();
-      let nextDueTime = null;
+      const nowMs = now.getTime();
+      const activeItems = (itemsState || []).filter(item => item.is_completed === 0 && item.next_review_due);
+      const dueItems = (dueItemsState || []).filter(item => item.is_completed === 0);
 
+      let targetTimeMs = null;
+      let isSnooze = false;
+
+      // 1. すでにDUEタスクがある場合は30分後のスヌーズ
+      if (dueItems.length > 0) {
+        targetTimeMs = nowMs + 30 * 60 * 1000;
+        isSnooze = true;
+      }
+
+      // 2. 直近の未来タスクの期限を探索
+      let nextDueTimeMs = null;
       activeItems.forEach(item => {
         const dueStr = String(item.next_review_due);
         const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
-        const dueDate = new Date(dueStrUtc);
+        const dueMs = new Date(dueStrUtc).getTime();
         
-        if (dueDate > now) {
-          if (!nextDueTime || dueDate < nextDueTime) {
-            nextDueTime = dueDate;
+        if (dueMs > nowMs) {
+          if (!nextDueTimeMs || dueMs < nextDueTimeMs) {
+            nextDueTimeMs = dueMs;
           }
         }
       });
 
-      if (nextDueTime) {
-        // 時間ピッタリではなく2秒遅延させて確実にDUE判定に入るようにする
-        const delay = nextDueTime.getTime() - now.getTime() + 2000;
+      // より早い方をターゲットにする
+      if (nextDueTimeMs) {
+        if (!targetTimeMs || nextDueTimeMs < targetTimeMs) {
+          targetTimeMs = nextDueTimeMs + 2000; // 2秒遅延させて確実にDUE判定に入る
+          isSnooze = false;
+        }
+      }
+
+      if (targetTimeMs) {
+        const delay = Math.max(targetTimeMs - nowMs, 1000);
         const safeDelay = Math.min(delay, 2147483647);
         nextReviewTimer = setTimeout(() => {
           if (userToken) {
             fetchItems();
-            sendAppNotification('エビングハウス・ラボ', '復習の時間になりました！学習記録を確認しましょう。');
+            const currentDue = (dueItemsState || []).filter(i => i.is_completed === 0);
+            if (currentDue.length > 0) {
+              const taskTopics = currentDue.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
+              const more = currentDue.length > 2 ? ` 他${dueItems.length - 2}件` : '';
+              sendAppNotification('エビングハウス・ラボ', `【スヌーズ】復習待ちのタスクが ${currentDue.length} 件あります（${taskTopics}${more}）。`);
+            } else {
+              sendAppNotification('エビングハウス・ラボ', '復習の時間になりました！学習記録を確認しましょう。');
+            }
           }
         }, safeDelay);
       }

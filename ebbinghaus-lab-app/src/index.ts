@@ -498,7 +498,7 @@ async function triggerCron(env: Bindings): Promise<string[]> {
        AND next_review_due <= ? 
        AND (last_notified_at IS NULL 
             OR last_notified_at < next_review_due 
-            OR datetime(last_notified_at, '+20 minutes') <= ?)`
+            OR datetime(last_notified_at, '+30 minutes') <= ?)`
     ).bind(now, now).all();
 
     addLog(`[CRON QUERY] dueItems found: ${dueItems ? dueItems.length : 0}`);
@@ -538,14 +538,14 @@ async function triggerCron(env: Bindings): Promise<string[]> {
 
     addLog(`[CRON] Total push sent successfully: ${successCount} / ${subscriptions.length}`);
 
-    // Update last_notified_at for the due items so we don't notify again until their next review or 20 minutes passes
+    // Update last_notified_at for the due items so we don't notify again until their next review or 30 minutes passes
     const updateRes = await env.DB.prepare(
       `UPDATE items SET last_notified_at = ? 
        WHERE is_completed = 0 
        AND next_review_due <= ? 
        AND (last_notified_at IS NULL 
             OR last_notified_at < next_review_due 
-            OR datetime(last_notified_at, '+20 minutes') <= ?)`
+            OR datetime(last_notified_at, '+30 minutes') <= ?)`
     ).bind(now, now, now).run();
 
     addLog(`[CRON END] Items updated. Success: ${updateRes.success}`);
