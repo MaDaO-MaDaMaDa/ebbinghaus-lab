@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Ebbinghaus Memory Lab // Learning Log</title>
   <meta name="description" content="Scientific Memory Spacing Engine based on Ebbinghaus Forgetting Curve">
   <meta name="theme-color" content="#0b0f19">
@@ -62,6 +62,29 @@
         linear-gradient(to right, rgba(30, 41, 59, 0.25) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(30, 41, 59, 0.25) 1px, transparent 1px);
       background-size: 24px 24px;
+    }
+
+    /* ==========================================
+       Status Bar & Safe Area Padding
+       ========================================== */
+    :root {
+      --safe-area-top: env(safe-area-inset-top, 0px);
+      --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    #main-header {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    /* ネイティブアプリ（Capacitor / PWA Standalone）でのステータスバー被り防止 */
+    body.is-native-app #main-header {
+      padding-top: max(env(safe-area-inset-top, 0px), 36px) !important;
+    }
+    body.is-native-app #auth-screen {
+      padding-top: max(env(safe-area-inset-top, 0px), 32px) !important;
+    }
+    body.is-native-app #initial-loading-screen {
+      padding-top: max(env(safe-area-inset-top, 0px), 32px) !important;
     }
 
     .scanline {
@@ -145,6 +168,14 @@
     }
   </style>
   <script>
+    function applyEnvironmentClasses() {
+      if (!document.body) return;
+      const isNative = !!(window.Capacitor?.isNativePlatform?.() || window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || window.location.protocol === 'file:' || document.referrer.includes('android-app://'));
+      if (isNative) {
+        document.body.classList.add('is-native-app');
+      }
+    }
+
     function handleOrientationChange() {
       if (!document.body) return;
       const isLandscapeMedia = window.matchMedia('(orientation: landscape)').matches;
@@ -154,16 +185,24 @@
       } else {
         document.body.classList.remove('show-orientation-warning');
       }
+      applyEnvironmentClasses();
     }
-    // DOM構築完了時に実行
-    document.addEventListener('DOMContentLoaded', handleOrientationChange);
-    window.addEventListener('load', handleOrientationChange);
+    // DOM構築完了時および即時実行
+    document.addEventListener('DOMContentLoaded', () => {
+      applyEnvironmentClasses();
+      handleOrientationChange();
+    });
+    window.addEventListener('load', () => {
+      applyEnvironmentClasses();
+      handleOrientationChange();
+    });
     window.addEventListener('resize', handleOrientationChange);
     window.addEventListener('orientationchange', handleOrientationChange);
   </script>
 </head>
 
 <body class="h-full flex flex-col antialiased selection:bg-lab-cyan selection:text-black overflow-hidden overscroll-none">
+  <script>applyEnvironmentClasses();</script>
   <!-- 縦画面要請UI -->
   <div id="orientation-warning">
     <div class="text-6xl mb-6">📱</div>
