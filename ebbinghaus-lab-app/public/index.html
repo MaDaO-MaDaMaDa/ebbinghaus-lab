@@ -784,7 +784,7 @@
         </div>
 
         <!-- NOTIFICATION SETTINGS -->
-        <div class="pt-6 border-t border-lab-border/50 space-y-3">
+        <div class="pt-6 border-t border-lab-border/50">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-md font-bold text-white">復習タイミングの通知</h3>
@@ -797,12 +797,6 @@
                 class="w-11 h-6 bg-lab-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-lab-muted after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-lab-cyan peer-checked:after:bg-white">
               </div>
             </label>
-          </div>
-          <div>
-            <button onclick="testPushNotification()" type="button"
-              class="text-xs bg-lab-panel border border-lab-cyan/60 hover:border-lab-cyan text-lab-cyan hover:bg-lab-cyan hover:text-black px-3 py-1.5 rounded transition font-bold">
-              🔔 今すぐテスト通知を試す
-            </button>
           </div>
         </div>
 
@@ -911,14 +905,32 @@
 
         <div class="space-y-4">
           <!-- Notification Test -->
-          <div class="p-4 border border-lab-border bg-lab-bg rounded flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-bold text-white font-mono-lab">PUSH NOTIFICATION TEST</h3>
-              <p class="text-xs text-lab-muted mt-1">現在の端末にテスト通知を送信します。※通知許可が必要です。</p>
+          <div class="p-4 border border-lab-border bg-lab-bg rounded space-y-3">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-sm font-bold text-white font-mono-lab flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-lab-cyan"></span>
+                  REVIEW NOTIFICATION TEST
+                </h3>
+                <p class="text-xs text-lab-muted mt-1">
+                  復習タイミングと同じロジックで通知を生成・送信します（実際の未完了タスクに応じたタイトル・文面・重要度で表示されます）。
+                </p>
+              </div>
             </div>
-            <button onclick="testPushNotification()" class="bg-lab-panel border border-lab-cyan text-lab-cyan hover:bg-lab-cyan hover:text-black font-bold text-xs px-4 py-2 rounded transition whitespace-nowrap">
-              テスト送信
-            </button>
+            <div class="flex flex-wrap gap-2 pt-1 border-t border-lab-border/40">
+              <button onclick="testReviewNotification(0)" type="button"
+                class="bg-lab-panel border border-lab-cyan text-lab-cyan hover:bg-lab-cyan hover:text-black font-bold text-xs px-3 py-2 rounded transition whitespace-nowrap flex items-center gap-1.5">
+                <span>🔔</span> 今すぐ復習通知を発火
+              </button>
+              <button onclick="testReviewNotification(5)" type="button"
+                class="bg-lab-panel border border-lab-cyan/60 hover:border-lab-cyan text-white hover:bg-lab-cyan/20 font-bold text-xs px-3 py-2 rounded transition whitespace-nowrap flex items-center gap-1.5">
+                <span>⏱️</span> 5秒後にスケジュール（閉じて確認）
+              </button>
+              <button onclick="checkScheduledNotifications()" type="button"
+                class="bg-lab-panel border border-lab-border hover:border-white text-lab-muted hover:text-white font-bold text-xs px-3 py-2 rounded transition whitespace-nowrap flex items-center gap-1.5">
+                <span>📋</span> 予約済み通知を確認
+              </button>
+            </div>
           </div>
 
           <!-- Cron Trigger Test -->
@@ -1045,12 +1057,34 @@
           description: 'エビングハウスの忘却曲線に基づく復習タイミングをお知らせします',
           importance: 5, // MAX: ポップアップ・音・バイブレーション
           visibility: 1, // PUBLIC: ロック画面にも表示
-          vibration: true
+          vibration: true,
+          sound: 'default'
         });
         console.log('[LocalNotifications] Notification channel ensured');
       } catch (e) {
         console.warn('[LocalNotifications] createChannel error:', e);
       }
+    }
+
+    function getReviewNotificationPayload() {
+      const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
+      const activeItems = (itemsState || []).filter(i => i.is_completed === 0);
+      
+      let title = "エビングハウス・ラボ";
+      let body = "";
+
+      if (dueItems.length > 0) {
+        const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
+        const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
+        body = `復習のタイミングが来ているタスクが ${dueItems.length} 件あります！（${taskTopics}${more}）`;
+      } else if (activeItems.length > 0) {
+        const item = activeItems[0];
+        body = `復習の時間です: 「${item.topic || item.title || '学習項目'}」`;
+      } else {
+        body = "復習の時間になりました！学習記録を確認しましょう。";
+      }
+
+      return { title, body };
     }
 
     function hashStringToInt(str) {
@@ -1624,9 +1658,11 @@
       switchView('dashboard');
     }
 
-    async function testPushNotification() {
+    async function testReviewNotification(delaySeconds = 0) {
       try {
         const LN = getLocalNotificationsPlugin();
+        const payload = getReviewNotificationPayload();
+
         if (LN) {
           showToast('通知権限・チャンネルを確認中...');
           await ensureNotificationChannel();
@@ -1639,24 +1675,118 @@
             });
             return;
           }
-          await sendAppNotification('【テスト通知】エビングハウス・ラボ', '通知は正常に機能しています！復習タイミングにもこのように届きます。');
-          showToast('🔔 テスト通知を送信しました！通知バーをご確認ください。');
+
+          const notifId = Math.floor(Math.random() * 899999) + 100000;
+          const scheduleTime = new Date(Date.now() + (delaySeconds > 0 ? delaySeconds * 1000 : 500));
+
+          await LN.schedule({
+            notifications: [
+              {
+                id: notifId,
+                title: payload.title,
+                body: payload.body,
+                channelId: NOTIFICATION_CHANNEL_ID,
+                smallIcon: 'ic_launcher',
+                schedule: { at: scheduleTime, allowWhileIdle: true },
+                extra: { type: 'review_notification' }
+              }
+            ]
+          });
+
+          if (delaySeconds > 0) {
+            showToast(`⏱️ ${delaySeconds}秒後に復習通知をスケジュールしました！アプリを最小化または画面をオフにしてお待ちください。`);
+          } else {
+            showToast('🔔 復習通知を発火しました！通知バーをご確認ください。');
+          }
           return;
         }
-        showToast('テスト通知を送信中...');
-        const res = await fetch('/api/debug/push-test', {
-          method: 'POST',
-          headers: getHeaders()
-        });
-        const data = await safeParseJson(res);
-        if (!res.ok) throw new Error(data.error || 'Push test failed');
-        if (data.sent > 0) {
-          showToast('送信完了: ' + data.sent + '端末');
-        } else {
-          showToast('送信失敗: サブスクリプションが見つかりません');
+
+        // Webブラウザ・PWA環境での動作
+        showToast('通知権限を確認中...');
+        if ("Notification" in window) {
+          let perm = Notification.permission;
+          if (perm !== "granted") {
+            perm = await Notification.requestPermission();
+          }
+          if (perm !== "granted") {
+            showCustomModal({
+              title: '通知が許可されていません',
+              message: 'ブラウザのサイト設定から通知を許可してください。',
+              confirmText: '確認'
+            });
+            return;
+          }
+
+          if (delaySeconds > 0) {
+            showToast(`⏱️ ${delaySeconds}秒後に復習通知を表示します。`);
+            setTimeout(async () => {
+              await sendAppNotification(payload.title, payload.body);
+            }, delaySeconds * 1000);
+          } else {
+            await sendAppNotification(payload.title, payload.body);
+            showToast('🔔 復習通知を表示しました！');
+          }
+          return;
         }
+
+        showCustomModal({
+          title: '通知非対応',
+          message: 'お使いのブラウザ・環境はローカル通知に対応していません。',
+          confirmText: 'OK'
+        });
       } catch (err) {
-        showCustomModal({ title: 'Error', message: err.message, confirmText: 'OK' });
+        console.error('testReviewNotification error:', err);
+        showCustomModal({ title: '通知送信エラー', message: err.message, confirmText: 'OK' });
+      }
+    }
+
+    // 後方互換用エイリアス
+    const testPushNotification = () => testReviewNotification(0);
+
+    async function checkScheduledNotifications() {
+      try {
+        const LN = getLocalNotificationsPlugin();
+        if (!LN || !LN.getPending) {
+          showCustomModal({
+            title: '予約済み通知一覧',
+            message: '<p class="text-xs text-lab-muted">Webブラウザ環境では端末スケジュールの直接確認はできません。<br>Androidアプリ（APK）環境で実行すると端末の予約リストが表示されます。</p>',
+            confirmText: '確認'
+          });
+          return;
+        }
+        const pending = await LN.getPending();
+        const list = pending?.notifications || [];
+        if (list.length === 0) {
+          showCustomModal({
+            title: '予約済み通知一覧',
+            message: '<p class="text-xs text-lab-muted">現在、端末に保留・予約されている通知はありません。<br>（タスクの復習期限が来ているか、タスクを新しく登録すると次回通知がスケジュールされます）</p>',
+            confirmText: '閉じる'
+          });
+          return;
+        }
+
+        let html = `<p class="text-xs text-lab-muted mb-2">現在端末に予約されている復習通知: <strong class="text-lab-cyan font-bold">${list.length}件</strong></p>`;
+        html += '<div class="space-y-2 max-h-60 overflow-y-auto text-left text-xs font-mono-lab">';
+        list.slice(0, 10).forEach((n) => {
+          const atTime = n.schedule?.at ? new Date(n.schedule.at).toLocaleString('ja-JP') : '指定なし';
+          html += `<div class="p-2 bg-lab-bg border border-lab-border rounded">
+            <div class="text-white font-bold">${n.title || 'エビングハウス・ラボ'}</div>
+            <div class="text-lab-muted text-[11px] truncate mt-0.5">${n.body || ''}</div>
+            <div class="text-lab-cyan text-[10px] mt-1">予定時刻: ${atTime}</div>
+          </div>`;
+        });
+        if (list.length > 10) {
+          html += `<p class="text-lab-muted text-[10px] text-center">...他 ${list.length - 10} 件</p>`;
+        }
+        html += '</div>';
+
+        showCustomModal({
+          title: '端末の予約済み通知一覧',
+          message: html,
+          confirmText: '閉じる'
+        });
+      } catch (err) {
+        showCustomModal({ title: '確認エラー', message: err.message, confirmText: 'OK' });
       }
     }
 
