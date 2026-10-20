@@ -2,3 +2,8 @@ node_modules
 .wrangler
 dist
 .env
+.DS_Store
+www/
+android/.gradle/
+android/build/
+android/app/build/

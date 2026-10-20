@@ -962,17 +962,167 @@
 
   <!-- SCRIPT LOGIC -->
   <script>
-    // Intercept fetch to support VS Code Live Server (port 5501/5500)
+    // Intercept fetch to support VS Code Live Server & Capacitor Native App
     const originalFetch = window.fetch;
     window.fetch = function() {
       let args = Array.prototype.slice.call(arguments);
       if (typeof args[0] === 'string' && args[0].startsWith('/api/')) {
         const isLiveServer = window.location.port === '5501' || window.location.port === '5500';
-        const baseUrl = isLiveServer ? 'http://127.0.0.1:8787' : '';
+        const isCapacitor = !!(window.Capacitor && (window.Capacitor.isNativePlatform?.() || window.location.protocol === 'file:' || (window.location.hostname === 'localhost' && window.location.port === '')));
+        let baseUrl = '';
+        if (isLiveServer) {
+          baseUrl = 'http://127.0.0.1:8787';
+        } else if (isCapacitor) {
+          baseUrl = 'https://ebbinghaus-lab-app.ryomawatanabe-0921.workers.dev';
+        }
         args[0] = baseUrl + args[0];
       }
       return originalFetch.apply(this, args);
     };
+
+    // ==========================================
+    // CAPACITOR LOCAL NOTIFICATIONS HELPERS
+    // ==========================================
+    function getLocalNotificationsPlugin() {
+      return window.Capacitor?.Plugins?.LocalNotifications;
+    }
+
+    function hashStringToInt(str) {
+      let hash = 0;
+      const s = String(str || '');
+      for (let i = 0; i < s.length; i++) {
+        hash = ((hash << 5) - hash) + s.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash);
+    }
+
+    async function requestAppNotificationPermission() {
+      const LN = getLocalNotificationsPlugin();
+      if (LN) {
+        try {
+          const check = await LN.checkPermissions();
+          if (check?.display === 'granted') return true;
+          const res = await LN.requestPermissions();
+          return res?.display === 'granted';
+        } catch (e) {
+          console.warn("LocalNotifications permission error:", e);
+        }
+      }
+      if ("Notification" in window) {
+        try {
+          const perm = await Notification.requestPermission();
+          return perm === "granted";
+        } catch (e) {
+          console.warn("Web Notification permission error:", e);
+        }
+      }
+      return false;
+    }
+
+    async function sendAppNotification(title, body) {
+      const LN = getLocalNotificationsPlugin();
+      if (LN) {
+        try {
+          const hasPerm = await requestAppNotificationPermission();
+          if (hasPerm) {
+            await LN.schedule({
+              notifications: [
+                {
+                  id: Math.floor(Math.random() * 899999) + 100000,
+                  title: title,
+                  body: body,
+                  smallIcon: 'ic_launcher'
+                }
+              ]
+            });
+            return;
+          }
+        } catch (e) {
+          console.warn("Local notification send error:", e);
+        }
+      }
+
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          if ('serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.ready.catch(() => null);
+            if (reg && reg.showNotification) {
+              reg.showNotification(title, {
+                body: body,
+                icon: '/icon.svg',
+                badge: '/icon.svg'
+              });
+              return;
+            }
+          }
+          new Notification(title, { body: body, icon: '/icon.svg' });
+        } catch (e) {
+          console.error("Web notification failed:", e);
+        }
+      }
+    }
+
+    async function syncLocalNotificationSchedules() {
+      if (!currentUser) return;
+      const prefKey = 'notifications_enabled_' + currentUser.username;
+      const isEnabled = localStorage.getItem(prefKey) === 'true';
+
+      const LN = getLocalNotificationsPlugin();
+      if (!LN) return;
+
+      try {
+        // 通知がオフの場合は保留中スケジュールを全削除
+        if (!isEnabled) {
+          const pending = await LN.getPending();
+          if (pending?.notifications?.length > 0) {
+            await LN.cancel({ notifications: pending.notifications });
+            console.log('[LocalNotifications] 全ての通知スケジュールをキャンセルしました。');
+          }
+          return;
+        }
+
+        const hasPerm = await requestAppNotificationPermission();
+        if (!hasPerm) return;
+
+        // 既存の保留中スケジュールをクリア
+        const pending = await LN.getPending();
+        if (pending?.notifications?.length > 0) {
+          await LN.cancel({ notifications: pending.notifications });
+        }
+
+        const scheduledNotifications = [];
+        const now = new Date();
+        const nowMs = now.getTime();
+
+        const activeItems = (itemsState || []).filter(item => item.is_completed === 0 && item.next_review_due);
+
+        activeItems.forEach((item, index) => {
+          const dueStr = String(item.next_review_due);
+          const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
+          const dueDate = new Date(dueStrUtc);
+
+          // 未来の予定時刻のみ登録
+          if (dueDate.getTime() > nowMs) {
+            const notifId = (hashStringToInt(`ebbinghaus_item_${item.id}`) % 900000) + 100000;
+            scheduledNotifications.push({
+              id: notifId,
+              title: "エビングハウス・ラボ",
+              body: `復習の時間です: 「${item.topic || item.title || '学習項目'}」`,
+              schedule: { at: dueDate },
+              smallIcon: 'ic_launcher'
+            });
+          }
+        });
+
+        if (scheduledNotifications.length > 0) {
+          await LN.schedule({ notifications: scheduledNotifications });
+          console.log(`[LocalNotifications] ${scheduledNotifications.length} 件の復習通知を端末にスケジュールしました。`);
+        }
+      } catch (err) {
+        console.warn('[LocalNotifications] スケジュール登録失敗:', err);
+      }
+    }
 
     let itemsState = [];
     let dueItemsState = [];
@@ -987,13 +1137,21 @@
       registerServiceWorker();
       checkAuthStatus();
 
-      // バックグラウンドからの復帰時にデータを更新
+      // バックグラウンドからの復帰時にデータを更新 & スケジュール再同期
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && userToken) {
           fetchItems();
         }
       });
 
+      // Capacitorアプリの状態変化（フォアグラウンド復帰）監視
+      if (window.Capacitor?.Plugins?.App) {
+        window.Capacitor.Plugins.App.addListener('appStateChange', (state) => {
+          if (state.isActive && userToken) {
+            fetchItems();
+          }
+        });
+      }
     });
 
     function registerServiceWorker() {
@@ -1131,6 +1289,7 @@
 
         showAppScreen();
         await fetchItems();
+        await syncLocalNotificationSchedules();
         hideLoadingScreen();
       } catch (e) {
         if (e.message === 'Unauthorized') {
@@ -1273,6 +1432,13 @@
       }
       if (viewName === 'history') renderManagementTable();
       if (viewName === 'reviews') renderReviewsView();
+      if (viewName === 'account') {
+        const toggle = document.getElementById('notification-toggle');
+        if (toggle && currentUser) {
+          const prefKey = 'notifications_enabled_' + currentUser.username;
+          toggle.checked = localStorage.getItem(prefKey) === 'true';
+        }
+      }
     }
     function showLoadingScreen(msg = 'LOADING SYSTEM...') {
       const loader = document.getElementById('initial-loading-screen');
@@ -1338,6 +1504,13 @@
 
     async function testPushNotification() {
       try {
+        const LN = getLocalNotificationsPlugin();
+        if (LN) {
+          showToast('テスト通知を送信中...');
+          await sendAppNotification('【テスト通知】エビングハウス・ラボ', '通知が正常に動作しています！復習タイミングにもお知らせが届きます。');
+          showToast('テスト通知を端末に送信しました');
+          return;
+        }
         showToast('テスト通知を送信中...');
         const res = await fetch('/api/debug/push-test', {
           method: 'POST',
@@ -1460,6 +1633,7 @@
         if (currentView === 'reviews') renderReviewsView();
         
         scheduleNextReviewFetch();
+        syncLocalNotificationSchedules();
       } catch (err) {
         console.error(err);
         if (err.message === 'Unauthorized') logout();
@@ -1496,7 +1670,10 @@
         const delay = nextDueTime.getTime() - now.getTime() + 2000;
         const safeDelay = Math.min(delay, 2147483647);
         nextReviewTimer = setTimeout(() => {
-          if (userToken) fetchItems();
+          if (userToken) {
+            fetchItems();
+            sendAppNotification('エビングハウス・ラボ', '復習の時間になりました！学習記録を確認しましょう。');
+          }
         }, safeDelay);
       }
     }
@@ -1944,53 +2121,59 @@
       }
     }
 
-    function handleNotificationToggle(e) {
+    async function handleNotificationToggle(e) {
       const prefKey = 'notifications_enabled_' + currentUser.username;
-      if (e.target.checked) {
-        if (!("Notification" in window)) {
-          showToast('このブラウザは通知をサポートしていません');
-          e.target.checked = false;
-          return;
-        }
-        Notification.requestPermission().then(async permission => {
-          if (permission === 'granted') {
+      const checkbox = e.target;
+      const willEnable = checkbox.checked;
+
+      if (willEnable) {
+        try {
+          const granted = await requestAppNotificationPermission();
+          if (!granted) {
+            checkbox.checked = false;
+            localStorage.setItem(prefKey, 'false');
+            showToast('通知が許可されませんでした。端末の設定をご確認ください。');
+            return;
+          }
+
+          localStorage.setItem(prefKey, 'true');
+          checkbox.checked = true;
+
+          // ローカル通知スケジュールを即時同期
+          await syncLocalNotificationSchedules();
+
+          // Web環境（Service Worker PushManager）の場合はWeb Pushの登録も並行して試行
+          if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
             try {
               const sw = await navigator.serviceWorker.register('/sw.js');
               const vapidRes = await fetch('/api/notifications/vapid-key', { headers: getHeaders() });
               const { publicKey } = await vapidRes.json();
-              
-              if (!publicKey) throw new Error('VAPID public key not found');
-              
-              const subscription = await sw.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlB64ToUint8Array(publicKey)
-              });
-
-              const res = await fetch('/api/notifications/subscribe', {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify(subscription)
-              });
-              
-              if (!res.ok) throw new Error('Subscription failed');
-              localStorage.setItem(prefKey, 'true');
-              showToast('通知が許可されました。復習の時間にお知らせします！');
-            } catch (err) {
-              console.error(err);
-              showToast('通知の登録に失敗しました: ' + err.message);
-              e.target.checked = false;
-              localStorage.setItem(prefKey, 'false');
+              if (publicKey) {
+                const subscription = await sw.pushManager.subscribe({
+                  userVisibleOnly: true,
+                  applicationServerKey: urlB64ToUint8Array(publicKey)
+                });
+                await fetch('/api/notifications/subscribe', {
+                  method: 'POST',
+                  headers: getHeaders(),
+                  body: JSON.stringify(subscription)
+                });
+              }
+            } catch (swErr) {
+              console.warn('[WebPush] Registration optional fallback:', swErr);
             }
-          } else {
-            showToast('通知がブロックされました。ブラウザの設定をご確認ください。');
-            e.target.checked = false;
-            localStorage.setItem(prefKey, 'false');
           }
-        });
+
+          showToast('通知がオンになりました。復習の時間にお知らせします！');
+        } catch (err) {
+          console.error('Notification toggle error:', err);
+          checkbox.checked = false;
+          localStorage.setItem(prefKey, 'false');
+          showToast('通知の設定に失敗しました: ' + err.message);
+        }
       } else {
         e.preventDefault();
-        const checkbox = e.target;
-        checkbox.checked = true; // revert visually to true
+        checkbox.checked = true; // 確認まで一旦ON表示のまま
 
         showCustomModal({
           title: '確認',
@@ -1998,26 +2181,36 @@
           confirmText: 'オフにする',
           cancelText: 'キャンセル',
           onConfirm: async () => {
-            if ('serviceWorker' in navigator) {
-              try {
-                const sw = await navigator.serviceWorker.ready;
-                const subscription = await sw.pushManager.getSubscription();
-                if (subscription) {
-                  await fetch('/api/notifications/unsubscribe', {
-                    method: 'POST',
-                    headers: getHeaders(),
-                    body: JSON.stringify(subscription)
-                  });
-                  await subscription.unsubscribe();
+            try {
+              localStorage.setItem(prefKey, 'false');
+              checkbox.checked = false;
+
+              // アプリローカル通知を全解除
+              await syncLocalNotificationSchedules();
+
+              // Web Pushの購読解除も試行
+              if ('serviceWorker' in navigator) {
+                try {
+                  const sw = await navigator.serviceWorker.ready;
+                  const subscription = await sw.pushManager.getSubscription();
+                  if (subscription) {
+                    await fetch('/api/notifications/unsubscribe', {
+                      method: 'POST',
+                      headers: getHeaders(),
+                      body: JSON.stringify(subscription)
+                    });
+                    await subscription.unsubscribe();
+                  }
+                } catch (unsubErr) {
+                  console.warn('[WebPush] Unsubscribe error:', unsubErr);
                 }
-                localStorage.setItem(prefKey, 'false');
-                checkbox.checked = false; // confirm visual change
-                showToast('通知をオフにしました');
-              } catch (err) {
-                console.error('Unsubscribe failed:', err);
-                showToast('通知の解除に失敗しました');
-                checkbox.checked = true; // revert on failure
               }
+
+              showToast('通知をオフにしました');
+            } catch (err) {
+              console.error('Unsubscribe error:', err);
+              showToast('通知の解除に失敗しました');
+              checkbox.checked = true;
             }
           }
         });
