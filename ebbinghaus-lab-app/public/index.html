@@ -1407,53 +1407,21 @@
         document.getElementById('header-username').innerText = currentUser.username;
         document.getElementById('account-username').innerText = currentUser.username;
 
-        // Fetch notification status from backend
-        try {
-          const statusRes = await fetch('/api/notifications/status', {
-            headers: { 'Authorization': 'Bearer ' + userToken }
-          });
-          const statusData = await safeParseJson(statusRes);
-          const toggle = document.getElementById('notification-toggle');
-          
-          const prefKey = 'notifications_enabled_' + currentUser.username;
-          const localPref = localStorage.getItem(prefKey);
+        // 端末ローカルの通知設定を反映（サーバーへの不要な通知ステータス通信を廃止）
+        const toggle = document.getElementById('notification-toggle');
+        const prefKey = 'notifications_enabled_' + currentUser.username;
+        const localPref = localStorage.getItem(prefKey);
 
-          if (localPref === 'false') {
-            if (toggle) toggle.checked = false;
-          } else {
-            // 未設定またはtrueの場合はデフォルトでON
-            if (toggle) toggle.checked = true;
-            localStorage.setItem(prefKey, 'true');
-            // ネイティブアプリの場合はパーミッション要求とチャンネル作成を即座に試行
-            ensureNotificationChannel().then(() => {
-              requestAppNotificationPermission().catch(console.warn);
-            });
-            // Web Pushの場合のサイレント再購読
-            if ("Notification" in window && Notification.permission === 'granted' && navigator.serviceWorker && !window.Capacitor?.isNativePlatform?.()) {
-              navigator.serviceWorker.ready.then(async sw => {
-                let sub = await sw.pushManager.getSubscription();
-                if (!sub) {
-                  const vapidRes = await fetch('/api/notifications/vapid-key', { headers: getHeaders() });
-                  const { publicKey } = await vapidRes.json();
-                  if (publicKey) {
-                    sub = await sw.pushManager.subscribe({
-                      userVisibleOnly: true,
-                      applicationServerKey: urlB64ToUint8Array(publicKey)
-                    });
-                  }
-                }
-                if (sub) {
-                  await fetch('/api/notifications/subscribe', {
-                    method: 'POST',
-                    headers: getHeaders(),
-                    body: JSON.stringify(sub)
-                  });
-                }
-              }).catch(err => console.error('Silent sub error:', err));
-            }
-          }
-        } catch (e) {
-          console.error('Failed to fetch notification status', e);
+        if (localPref === 'false') {
+          if (toggle) toggle.checked = false;
+        } else {
+          // 未設定またはtrueの場合はデフォルトでON
+          if (toggle) toggle.checked = true;
+          localStorage.setItem(prefKey, 'true');
+          // ネイティブアプリの場合はパーミッション要求とチャンネル作成を即座に試行
+          ensureNotificationChannel().then(() => {
+            requestAppNotificationPermission().catch(console.warn);
+          });
         }
 
         showAppScreen();
@@ -2438,30 +2406,8 @@
           localStorage.setItem(prefKey, 'true');
           checkbox.checked = true;
 
-          // ローカル通知スケジュールを即時同期
+          // ローカル通知スケジュールを即時同期（サーバーへのWeb Push登録通信は廃止）
           await syncLocalNotificationSchedules();
-
-          // Web環境（Service Worker PushManager）の場合はWeb Pushの登録も並行して試行
-          if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
-            try {
-              const sw = await navigator.serviceWorker.register('/sw.js');
-              const vapidRes = await fetch('/api/notifications/vapid-key', { headers: getHeaders() });
-              const { publicKey } = await vapidRes.json();
-              if (publicKey) {
-                const subscription = await sw.pushManager.subscribe({
-                  userVisibleOnly: true,
-                  applicationServerKey: urlB64ToUint8Array(publicKey)
-                });
-                await fetch('/api/notifications/subscribe', {
-                  method: 'POST',
-                  headers: getHeaders(),
-                  body: JSON.stringify(subscription)
-                });
-              }
-            } catch (swErr) {
-              console.warn('[WebPush] Registration optional fallback:', swErr);
-            }
-          }
 
           showToast('通知がオンになりました。復習の時間にお知らせします！');
         } catch (err) {
@@ -2486,24 +2432,6 @@
 
               // アプリローカル通知を全解除
               await syncLocalNotificationSchedules();
-
-              // Web Pushの購読解除も試行
-              if ('serviceWorker' in navigator) {
-                try {
-                  const sw = await navigator.serviceWorker.ready;
-                  const subscription = await sw.pushManager.getSubscription();
-                  if (subscription) {
-                    await fetch('/api/notifications/unsubscribe', {
-                      method: 'POST',
-                      headers: getHeaders(),
-                      body: JSON.stringify(subscription)
-                    });
-                    await subscription.unsubscribe();
-                  }
-                } catch (unsubErr) {
-                  console.warn('[WebPush] Unsubscribe error:', unsubErr);
-                }
-              }
 
               showToast('通知をオフにしました');
             } catch (err) {

@@ -597,8 +597,7 @@ export const honoApp = app;
 
 export default {
   fetch: app.fetch,
-  scheduled: async (event: any, env: Bindings, ctx: any) => {
-    console.log(`[CRON TRIGGERED BY CLOUDFLARE] cron type: ${event?.cron}, scheduledTime: ${event?.scheduledTime}`);
-    ctx.waitUntil(triggerCron(env));
+  scheduled: async (_event: any, _env: Bindings, _ctx: any) => {
+    // スマホアプリ側（Capacitor LocalNotifications）で通知管理するため定期Web Pushは停止
   }
 };
