@@ -784,7 +784,7 @@
         </div>
 
         <!-- NOTIFICATION SETTINGS -->
-        <div class="pt-6 border-t border-lab-border/50">
+        <div class="pt-6 border-t border-lab-border/50 space-y-4">
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-md font-bold text-white">復習タイミングの通知</h3>
@@ -797,6 +797,42 @@
                 class="w-11 h-6 bg-lab-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-lab-muted after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-lab-cyan peer-checked:after:bg-white">
               </div>
             </label>
+          </div>
+
+          <!-- クワイエットアワー（夜間の通知停止時間帯）設定 -->
+          <div id="quiet-hours-section" class="p-3 bg-lab-bg/60 border border-lab-border rounded-lg space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-xs text-white font-semibold flex items-center gap-1.5">
+                  <span>🌙</span> 夜間の通知を停止する
+                </span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="quiet-hours-toggle" class="sr-only peer"
+                  onchange="handleQuietHoursToggle(event)">
+                <div
+                  class="w-9 h-5 bg-lab-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-lab-muted after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-lab-cyan peer-checked:after:bg-white">
+                </div>
+              </label>
+            </div>
+            <p class="text-[11px] text-lab-muted leading-relaxed">
+              指定した時間帯（デフォルト: 0:00〜6:00）は通知を行わず、停止時間の終了後にまとめて再開します。
+            </p>
+            <div id="quiet-hours-inputs" class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <div class="flex items-center gap-1.5 bg-lab-card/80 border border-lab-border px-2.5 py-1.5 rounded">
+                <span class="text-lab-muted text-[11px]">停止開始:</span>
+                <input type="time" id="quiet-hours-start" value="00:00"
+                  class="bg-transparent text-white font-mono text-xs focus:outline-none focus:text-lab-cyan cursor-pointer"
+                  onchange="handleQuietHoursChange()">
+              </div>
+              <span class="text-lab-muted text-xs">〜</span>
+              <div class="flex items-center gap-1.5 bg-lab-card/80 border border-lab-border px-2.5 py-1.5 rounded">
+                <span class="text-lab-muted text-[11px]">通知再開:</span>
+                <input type="time" id="quiet-hours-end" value="06:00"
+                  class="bg-transparent text-white font-mono text-xs focus:outline-none focus:text-lab-cyan cursor-pointer"
+                  onchange="handleQuietHoursChange()">
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1181,21 +1217,141 @@
 
     let lastDueAlertTimestamp = 0;
 
-    // 前後・近接する復習通知を1回にまとめるためのヘルパー関数
+    // クワイエットアワー（夜間通知停止時間帯）の設定取得（デフォルト: 00:00〜06:00 で有効）
+    function getQuietHoursConfig() {
+      if (!currentUser) {
+        return { enabled: true, start: "00:00", end: "06:00" };
+      }
+      const enabledKey = 'quiet_hours_enabled_' + currentUser.username;
+      const startKey = 'quiet_hours_start_' + currentUser.username;
+      const endKey = 'quiet_hours_end_' + currentUser.username;
+
+      const rawEnabled = localStorage.getItem(enabledKey);
+      const enabled = rawEnabled === null ? true : rawEnabled === 'true'; // デフォルトで有効 (true)
+      const start = localStorage.getItem(startKey) || "00:00"; // デフォルトで 00:00
+      const end = localStorage.getItem(endKey) || "06:00";     // デフォルトで 06:00
+
+      return { enabled, start, end };
+    }
+
+    // 指定日時がクワイエットアワー（通知停止時間帯）に含まれるか判定
+    function isTimeInQuietHours(date, config) {
+      if (!config || !config.enabled) return false;
+      const [sH, sM] = (config.start || "00:00").split(':').map(Number);
+      const [eH, eM] = (config.end || "06:00").split(':').map(Number);
+      const startMinutes = sH * 60 + sM;
+      const endMinutes = eH * 60 + eM;
+      if (startMinutes === endMinutes) return false;
+
+      const currentMinutes = date.getHours() * 60 + date.getMinutes();
+      if (startMinutes < endMinutes) {
+        // 同日内の範囲（例: 00:00 〜 06:00）
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        // 日跨ぎの範囲（例: 23:00 〜 07:00）
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+    }
+
+    // 夜間（通知停止時間帯）に予定された日時を、通知再開時刻（翌朝などの終了時刻）にシフト
+    function adjustForQuietHours(date, config) {
+      if (!config || !config.enabled) return new Date(date);
+      const [sH, sM] = (config.start || "00:00").split(':').map(Number);
+      const [eH, eM] = (config.end || "06:00").split(':').map(Number);
+      const startMinutes = sH * 60 + sM;
+      const endMinutes = eH * 60 + eM;
+      if (startMinutes === endMinutes) return new Date(date);
+
+      const currentMinutes = date.getHours() * 60 + date.getMinutes();
+      const adjusted = new Date(date);
+
+      if (startMinutes < endMinutes) {
+        // 同日内の範囲（例: 00:00 〜 06:00）
+        if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+          adjusted.setHours(eH, eM, 0, 0);
+          return adjusted;
+        }
+      } else {
+        // 日跨ぎの範囲（例: 23:00 〜 06:00）
+        if (currentMinutes >= startMinutes) {
+          adjusted.setDate(adjusted.getDate() + 1);
+          adjusted.setHours(eH, eM, 0, 0);
+          return adjusted;
+        } else if (currentMinutes < endMinutes) {
+          adjusted.setHours(eH, eM, 0, 0);
+          return adjusted;
+        }
+      }
+      return adjusted;
+    }
+
+    function updateQuietHoursUI() {
+      if (!currentUser) return;
+      const config = getQuietHoursConfig();
+      const toggle = document.getElementById('quiet-hours-toggle');
+      const startInput = document.getElementById('quiet-hours-start');
+      const endInput = document.getElementById('quiet-hours-end');
+      const inputsContainer = document.getElementById('quiet-hours-inputs');
+
+      if (toggle) toggle.checked = config.enabled;
+      if (startInput) startInput.value = config.start;
+      if (endInput) endInput.value = config.end;
+      if (inputsContainer) {
+        inputsContainer.style.opacity = config.enabled ? '1' : '0.4';
+        inputsContainer.style.pointerEvents = config.enabled ? 'auto' : 'none';
+      }
+    }
+
+    async function handleQuietHoursToggle(e) {
+      if (!currentUser) return;
+      const enabled = e.target.checked;
+      const enabledKey = 'quiet_hours_enabled_' + currentUser.username;
+      localStorage.setItem(enabledKey, enabled ? 'true' : 'false');
+      updateQuietHoursUI();
+      await syncLocalNotificationSchedules();
+      showToast(enabled ? '夜間の通知停止を有効にしました（指定時間帯は通知せず、終了後に再開）' : '夜間の通知停止を無効にしました');
+    }
+
+    async function handleQuietHoursChange() {
+      if (!currentUser) return;
+      const startInput = document.getElementById('quiet-hours-start');
+      const endInput = document.getElementById('quiet-hours-end');
+      if (!startInput || !endInput) return;
+
+      const start = startInput.value || "00:00";
+      const end = endInput.value || "06:00";
+
+      const startKey = 'quiet_hours_start_' + currentUser.username;
+      const endKey = 'quiet_hours_end_' + currentUser.username;
+
+      localStorage.setItem(startKey, start);
+      localStorage.setItem(endKey, end);
+
+      await syncLocalNotificationSchedules();
+      showToast(`通知停止時間帯を ${start} 〜 ${end} に更新しました`);
+    }
+
+    // 前後・近接する復習通知を1回にまとめるためのヘルパー関数（夜間停止も加味）
     function groupNotificationTasks(activeItems, nowMs) {
+      const quietConfig = getQuietHoursConfig();
       const validTasks = [];
+
       for (const item of (activeItems || [])) {
         if (!item.next_review_due || item.is_completed === 1) continue;
         const dueStr = String(item.next_review_due);
         const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
-        const dueDate = new Date(dueStrUtc);
-        const dueMs = dueDate.getTime();
-        if (dueMs > nowMs) {
+        const originalDueDate = new Date(dueStrUtc);
+
+        // 夜間通知停止時間帯にかかる場合は、通知再開時刻（例: 朝06:00）にシフト
+        const effectiveDueDate = adjustForQuietHours(originalDueDate, quietConfig);
+        const effectiveDueMs = effectiveDueDate.getTime();
+
+        if (effectiveDueMs > nowMs) {
           validTasks.push({
             id: item.id,
             topic: item.topic || item.title || '学習項目',
-            dueDate: dueDate,
-            dueMs: dueMs
+            dueDate: effectiveDueDate,
+            dueMs: effectiveDueMs
           });
         }
       }
@@ -1281,10 +1437,11 @@
         const scheduledNotifications = [];
         const now = new Date();
         const nowMs = now.getTime();
+        const quietConfig = getQuietHoursConfig();
 
         const activeItems = (itemsState || []).filter(item => item.is_completed === 0 && item.next_review_due);
 
-        // 1. 未来の復習タスクを近接グループごとにまとめて1回でスケジュール
+        // 1. 未来の復習タスクを近接グループごとにまとめて1回でスケジュール（夜間帯は朝6時以降にシフト済み）
         const notificationGroups = groupNotificationTasks(activeItems, nowMs);
 
         notificationGroups.forEach((group, index) => {
@@ -1303,10 +1460,13 @@
           });
 
           // 予定時刻後も復習されない場合に備え、グループ単位で+30分後・+60分後・+90分後のスヌーズをスケジュール
-          // スヌーズ時も【スヌーズ】等のプレフィックスは付けず、簡潔に通知
+          // スヌーズ時刻が夜間（停止時間帯）にかかる場合は除外
           if (index < 5) { // 端末リソースを考慮し直近5グループに適用
             for (let step = 1; step <= 3; step++) {
               const snoozeTime = new Date(group.scheduleMs + step * 30 * 60 * 1000);
+              if (isTimeInQuietHours(snoozeTime, quietConfig)) {
+                continue;
+              }
               const snoozeId = (hashStringToInt(`${groupHashKey}_snooze_${step}`) % 800000) + 100000;
               scheduledNotifications.push({
                 id: snoozeId,
@@ -1324,21 +1484,27 @@
         const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
         if (dueItems.length > 0) {
           const dueNotif = formatGroupNotification(dueItems);
-          // 直近30分以内に通知していなければ即時通知を鳴らす
-          if (nowMs - lastDueAlertTimestamp > 30 * 60 * 1000) {
+          const isQuietNow = isTimeInQuietHours(now, quietConfig);
+
+          // 現在が夜間停止時間帯でなく、かつ直近30分以内に通知していなければ即時通知を鳴らす
+          if (!isQuietNow && (nowMs - lastDueAlertTimestamp > 30 * 60 * 1000)) {
             lastDueAlertTimestamp = nowMs;
             sendAppNotification(dueNotif.title, dueNotif.body);
           }
 
-          // アプリを閉じた状態でも定期的に通知されるよう、30分ごとにスヌーズ通知をスケジュール（最大8回 = 4時間分）
+          // アプリを閉じた状態でも定期的に通知されるよう、30分ごとにスヌーズ通知をスケジュール（夜間にかかるものは除外）
           for (let step = 1; step <= 8; step++) {
             const snoozeDelayMs = step * 30 * 60 * 1000;
+            const snoozeDate = new Date(nowMs + snoozeDelayMs);
+            if (isTimeInQuietHours(snoozeDate, quietConfig)) {
+              continue;
+            }
             scheduledNotifications.push({
               id: 999200 + step,
               title: dueNotif.title,
               body: dueNotif.body,
               channelId: NOTIFICATION_CHANNEL_ID,
-              schedule: { at: new Date(nowMs + snoozeDelayMs), allowWhileIdle: true },
+              schedule: { at: snoozeDate, allowWhileIdle: true },
               smallIcon: 'ic_launcher'
             });
           }
@@ -1493,6 +1659,9 @@
           });
         }
 
+        // クワイエットアワー（夜間停止）設定のUI反映
+        updateQuietHoursUI();
+
         showAppScreen();
         await fetchItems();
         await syncLocalNotificationSchedules();
@@ -1644,6 +1813,7 @@
           const prefKey = 'notifications_enabled_' + currentUser.username;
           toggle.checked = localStorage.getItem(prefKey) === 'true';
         }
+        updateQuietHoursUI();
       }
     }
     function showLoadingScreen(msg = 'LOADING SYSTEM...') {
@@ -1815,7 +1985,7 @@
           return;
         }
 
-        let html = `<p class="text-xs text-lab-muted mb-2">現在端末に予約されている復習通知: <strong class="text-lab-cyan font-bold">${list.length}件</strong> <span class="text-[11px] text-lab-muted/80">（直近・直後の通知は1回に集約）</span></p>`;
+        let html = `<p class="text-xs text-lab-muted mb-2">現在端末に予約されている復習通知: <strong class="text-lab-cyan font-bold">${list.length}件</strong> <span class="text-[11px] text-lab-muted/80">（直近集約 / 夜間停止対応）</span></p>`;
         html += '<div class="space-y-2 max-h-60 overflow-y-auto text-left text-xs font-mono-lab">';
         list.slice(0, 10).forEach((n) => {
           const atTime = n.schedule?.at ? new Date(n.schedule.at).toLocaleString('ja-JP') : '指定なし';
