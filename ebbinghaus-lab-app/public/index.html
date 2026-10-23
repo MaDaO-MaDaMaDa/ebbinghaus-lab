@@ -788,7 +788,7 @@
           <div class="flex items-center justify-between">
             <div>
               <h3 class="text-md font-bold text-white">復習タイミングの通知</h3>
-              <p class="text-xs text-lab-muted mt-0.5">復習時間になると端末に通知します（未完了時は30分ごとにスヌーズ）</p>
+              <p class="text-xs text-lab-muted mt-0.5">復習時間になると端末に通知します（近い時間の復習はまとめて1回でお知らせ / 30分スヌーズ対応）</p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="notification-toggle" class="sr-only peer"
@@ -1066,25 +1066,37 @@
       }
     }
 
+    // グループ化されたタスクに応じた通知タイトル・本文を生成（1行目「復習の時間です！」、2行目以降にタスク名を並べる）
+    function formatGroupNotification(tasks) {
+      const validTasks = tasks || [];
+      const count = validTasks.length;
+
+      if (count === 0) {
+        return {
+          title: "復習の時間です！",
+          body: "学習記録を確認しましょう。"
+        };
+      }
+
+      const maxDisplay = 5;
+      const displayTasks = validTasks.slice(0, maxDisplay);
+      const lines = displayTasks.map(t => t.topic || t.title || '学習項目');
+
+      if (count > maxDisplay) {
+        lines.push(`他${count - maxDisplay}件`);
+      }
+
+      return {
+        title: "復習の時間です！",
+        body: lines.join('\n')
+      };
+    }
+
     function getReviewNotificationPayload() {
       const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
       const activeItems = (itemsState || []).filter(i => i.is_completed === 0);
-      
-      let title = "エビングハウス・ラボ";
-      let body = "";
-
-      if (dueItems.length > 0) {
-        const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
-        const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
-        body = `復習のタイミングが来ているタスクが ${dueItems.length} 件あります！（${taskTopics}${more}）`;
-      } else if (activeItems.length > 0) {
-        const item = activeItems[0];
-        body = `復習の時間です: 「${item.topic || item.title || '学習項目'}」`;
-      } else {
-        body = "復習の時間になりました！学習記録を確認しましょう。";
-      }
-
-      return { title, body };
+      const targetItems = dueItems.length > 0 ? dueItems : activeItems;
+      return formatGroupNotification(targetItems);
     }
 
     function hashStringToInt(str) {
@@ -1169,6 +1181,65 @@
 
     let lastDueAlertTimestamp = 0;
 
+    // 前後・近接する復習通知を1回にまとめるためのヘルパー関数
+    function groupNotificationTasks(activeItems, nowMs) {
+      const validTasks = [];
+      for (const item of (activeItems || [])) {
+        if (!item.next_review_due || item.is_completed === 1) continue;
+        const dueStr = String(item.next_review_due);
+        const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
+        const dueDate = new Date(dueStrUtc);
+        const dueMs = dueDate.getTime();
+        if (dueMs > nowMs) {
+          validTasks.push({
+            id: item.id,
+            topic: item.topic || item.title || '学習項目',
+            dueDate: dueDate,
+            dueMs: dueMs
+          });
+        }
+      }
+
+      // 期日の昇順にソート
+      validTasks.sort((a, b) => a.dueMs - b.dueMs);
+
+      const BATCH_GAP_MS = 30 * 60 * 1000; // 直前・直後が30分以内なら同一グループに束ねる
+      const MAX_BATCH_SPAN_MS = 60 * 60 * 1000; // 1グループの最大期間は60分に制限
+
+      const groups = [];
+      let currentGroup = null;
+
+      for (const task of validTasks) {
+        if (!currentGroup) {
+          currentGroup = {
+            tasks: [task],
+            scheduleDate: task.dueDate,
+            scheduleMs: task.dueMs,
+            lastDueMs: task.dueMs
+          };
+          groups.push(currentGroup);
+        } else {
+          const gap = task.dueMs - currentGroup.lastDueMs;
+          const totalSpan = task.dueMs - currentGroup.scheduleMs;
+
+          if (gap <= BATCH_GAP_MS && totalSpan <= MAX_BATCH_SPAN_MS) {
+            currentGroup.tasks.push(task);
+            currentGroup.lastDueMs = task.dueMs;
+          } else {
+            currentGroup = {
+              tasks: [task],
+              scheduleDate: task.dueDate,
+              scheduleMs: task.dueMs,
+              lastDueMs: task.dueMs
+            };
+            groups.push(currentGroup);
+          }
+        }
+      }
+
+      return groups;
+    }
+
     async function syncLocalNotificationSchedules() {
       if (!currentUser) return;
       const prefKey = 'notifications_enabled_' + currentUser.username;
@@ -1213,61 +1284,59 @@
 
         const activeItems = (itemsState || []).filter(item => item.is_completed === 0 && item.next_review_due);
 
-        // 1. 未来の復習タスクをスケジュール
-        activeItems.forEach((item, index) => {
-          const dueStr = String(item.next_review_due);
-          const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
-          const dueDate = new Date(dueStrUtc);
+        // 1. 未来の復習タスクを近接グループごとにまとめて1回でスケジュール
+        const notificationGroups = groupNotificationTasks(activeItems, nowMs);
 
-          if (dueDate.getTime() > nowMs) {
-            const notifId = (hashStringToInt(`ebbinghaus_item_${item.id}`) % 800000) + 100000;
-            scheduledNotifications.push({
-              id: notifId,
-              title: "エビングハウス・ラボ",
-              body: `復習の時間です: 「${item.topic || item.title || '学習項目'}」`,
-              channelId: NOTIFICATION_CHANNEL_ID,
-              schedule: { at: dueDate, allowWhileIdle: true },
-              smallIcon: 'ic_launcher'
-            });
+        notificationGroups.forEach((group, index) => {
+          const { title, body } = formatGroupNotification(group.tasks);
+          // グループ固有のIDを生成
+          const groupHashKey = `ebbinghaus_group_${group.tasks[0].id}_cnt${group.tasks.length}_time${group.scheduleMs}`;
+          const notifId = (hashStringToInt(groupHashKey) % 800000) + 100000;
 
-            // 予定時刻後も復習されない場合に備え、+30分後・+60分後・+90分後のスヌーズをあらかじめスケジュール
-            if (index < 5) { // 端末リソースを考慮し直近5件に適用
-              for (let step = 1; step <= 3; step++) {
-                const snoozeTime = new Date(dueDate.getTime() + step * 30 * 60 * 1000);
-                const snoozeId = (hashStringToInt(`ebbinghaus_item_${item.id}_snooze_${step}`) % 800000) + 100000;
-                scheduledNotifications.push({
-                  id: snoozeId,
-                  title: "エビングハウス・ラボ",
-                  body: `【スヌーズ】復習の時間です: 「${item.topic || item.title || '学習項目'}」`,
-                  channelId: NOTIFICATION_CHANNEL_ID,
-                  schedule: { at: snoozeTime, allowWhileIdle: true },
-                  smallIcon: 'ic_launcher'
-                });
-              }
+          scheduledNotifications.push({
+            id: notifId,
+            title: title,
+            body: body,
+            channelId: NOTIFICATION_CHANNEL_ID,
+            schedule: { at: group.scheduleDate, allowWhileIdle: true },
+            smallIcon: 'ic_launcher'
+          });
+
+          // 予定時刻後も復習されない場合に備え、グループ単位で+30分後・+60分後・+90分後のスヌーズをスケジュール
+          // スヌーズ時も【スヌーズ】等のプレフィックスは付けず、簡潔に通知
+          if (index < 5) { // 端末リソースを考慮し直近5グループに適用
+            for (let step = 1; step <= 3; step++) {
+              const snoozeTime = new Date(group.scheduleMs + step * 30 * 60 * 1000);
+              const snoozeId = (hashStringToInt(`${groupHashKey}_snooze_${step}`) % 800000) + 100000;
+              scheduledNotifications.push({
+                id: snoozeId,
+                title: title,
+                body: body,
+                channelId: NOTIFICATION_CHANNEL_ID,
+                schedule: { at: snoozeTime, allowWhileIdle: true },
+                smallIcon: 'ic_launcher'
+              });
             }
           }
         });
 
-        // 2. すでに期限が来ている（DUE）未完了タスクの処理
+        // 2. すでに期限が来ている（DUE）未完了タスクの処理（すべてまとめて1回で通知）
         const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
         if (dueItems.length > 0) {
+          const dueNotif = formatGroupNotification(dueItems);
           // 直近30分以内に通知していなければ即時通知を鳴らす
           if (nowMs - lastDueAlertTimestamp > 30 * 60 * 1000) {
             lastDueAlertTimestamp = nowMs;
-            const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
-            const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
-            sendAppNotification("エビングハウス・ラボ", `復習のタイミングが来ているタスクが ${dueItems.length} 件あります！（${taskTopics}${more}）`);
+            sendAppNotification(dueNotif.title, dueNotif.body);
           }
 
           // アプリを閉じた状態でも定期的に通知されるよう、30分ごとにスヌーズ通知をスケジュール（最大8回 = 4時間分）
-          const taskTopics = dueItems.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
-          const more = dueItems.length > 2 ? ` 他${dueItems.length - 2}件` : '';
           for (let step = 1; step <= 8; step++) {
             const snoozeDelayMs = step * 30 * 60 * 1000;
             scheduledNotifications.push({
               id: 999200 + step,
-              title: "エビングハウス・ラボ",
-              body: `【スヌーズ】復習待ちのタスクが ${dueItems.length} 件あります（${taskTopics}${more}）。記憶が薄れる前に復習しましょう！`,
+              title: dueNotif.title,
+              body: dueNotif.body,
               channelId: NOTIFICATION_CHANNEL_ID,
               schedule: { at: new Date(nowMs + snoozeDelayMs), allowWhileIdle: true },
               smallIcon: 'ic_launcher'
@@ -1277,7 +1346,7 @@
 
         if (scheduledNotifications.length > 0) {
           await LN.schedule({ notifications: scheduledNotifications });
-          console.log(`[LocalNotifications] ${scheduledNotifications.length} 件の通知を端末にスケジュールしました。`);
+          console.log(`[LocalNotifications] ${scheduledNotifications.length} 件の通知を端末にスケジュールしました。（${notificationGroups.length} グループに集約）`);
         }
       } catch (err) {
         console.warn('[LocalNotifications] スケジュール登録失敗:', err);
@@ -1746,13 +1815,13 @@
           return;
         }
 
-        let html = `<p class="text-xs text-lab-muted mb-2">現在端末に予約されている復習通知: <strong class="text-lab-cyan font-bold">${list.length}件</strong></p>`;
+        let html = `<p class="text-xs text-lab-muted mb-2">現在端末に予約されている復習通知: <strong class="text-lab-cyan font-bold">${list.length}件</strong> <span class="text-[11px] text-lab-muted/80">（直近・直後の通知は1回に集約）</span></p>`;
         html += '<div class="space-y-2 max-h-60 overflow-y-auto text-left text-xs font-mono-lab">';
         list.slice(0, 10).forEach((n) => {
           const atTime = n.schedule?.at ? new Date(n.schedule.at).toLocaleString('ja-JP') : '指定なし';
           html += `<div class="p-2 bg-lab-bg border border-lab-border rounded">
-            <div class="text-white font-bold">${n.title || 'エビングハウス・ラボ'}</div>
-            <div class="text-lab-muted text-[11px] truncate mt-0.5">${n.body || ''}</div>
+            <div class="text-white font-bold">${n.title || '復習の時間です！'}</div>
+            <div class="text-lab-muted text-[11px] whitespace-pre-line mt-0.5">${n.body || ''}</div>
             <div class="text-lab-cyan text-[10px] mt-1">予定時刻: ${atTime}</div>
           </div>`;
         });
@@ -1896,50 +1965,27 @@
       const dueItems = (dueItemsState || []).filter(item => item.is_completed === 0);
 
       let targetTimeMs = null;
-      let isSnooze = false;
 
-      // 1. すでにDUEタスクがある場合は30分後のスヌーズ
+      // 1. すでにDUEタスクがある場合は30分後のスヌーズ同期
       if (dueItems.length > 0) {
         targetTimeMs = nowMs + 30 * 60 * 1000;
-        isSnooze = true;
       }
 
-      // 2. 直近の未来タスクの期限を探索
-      let nextDueTimeMs = null;
-      activeItems.forEach(item => {
-        const dueStr = String(item.next_review_due);
-        const dueStrUtc = dueStr.endsWith('Z') ? dueStr : dueStr.replace(' ', 'T') + 'Z';
-        const dueMs = new Date(dueStrUtc).getTime();
-        
-        if (dueMs > nowMs) {
-          if (!nextDueTimeMs || dueMs < nextDueTimeMs) {
-            nextDueTimeMs = dueMs;
-          }
-        }
-      });
-
-      // より早い方をターゲットにする
-      if (nextDueTimeMs) {
-        if (!targetTimeMs || nextDueTimeMs < targetTimeMs) {
-          targetTimeMs = nextDueTimeMs + 2000; // 2秒遅延させて確実にDUE判定に入る
-          isSnooze = false;
+      // 2. 直近の未来タスクグループの予定時刻を探索（近接するものは1回にまとめる）
+      const notificationGroups = groupNotificationTasks(activeItems, nowMs);
+      if (notificationGroups.length > 0) {
+        const nextGroupScheduleMs = notificationGroups[0].scheduleMs;
+        if (!targetTimeMs || nextGroupScheduleMs < targetTimeMs) {
+          targetTimeMs = nextGroupScheduleMs + 2000; // 2秒遅延させて確実に期日経過後の判定に入る
         }
       }
 
       if (targetTimeMs) {
         const delay = Math.max(targetTimeMs - nowMs, 1000);
         const safeDelay = Math.min(delay, 2147483647);
-        nextReviewTimer = setTimeout(() => {
+        nextReviewTimer = setTimeout(async () => {
           if (userToken) {
-            fetchItems();
-            const currentDue = (dueItemsState || []).filter(i => i.is_completed === 0);
-            if (currentDue.length > 0) {
-              const taskTopics = currentDue.slice(0, 2).map(i => i.topic || i.title || '学習項目').join('、');
-              const more = currentDue.length > 2 ? ` 他${dueItems.length - 2}件` : '';
-              sendAppNotification('エビングハウス・ラボ', `【スヌーズ】復習待ちのタスクが ${currentDue.length} 件あります（${taskTopics}${more}）。`);
-            } else {
-              sendAppNotification('エビングハウス・ラボ', '復習の時間になりました！学習記録を確認しましょう。');
-            }
+            await fetchItems();
           }
         }, safeDelay);
       }
