@@ -281,9 +281,9 @@
 
     <!-- SYSTEM LOG FEEDBACK TOAST -->
     <div id="sys-toast"
-      class="hidden fixed top-20 right-4 md:bottom-6 md:top-auto md:right-6 z-50 lab-panel p-3 border-l-4 border-lab-cyan max-w-md shadow-2xl transition-all duration-300">
+      class="hidden fixed top-20 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-[250] lab-panel p-3 border-l-4 border-lab-cyan shadow-2xl transition-all duration-300 break-words pointer-events-auto">
       <div class="text-xs font-bold text-lab-cyan tracking-widest font-mono-lab">[SYS_NOTIFICATION]</div>
-      <div id="toast-message" class="text-sm font-semibold text-lab-text mt-1"></div>
+      <div id="toast-message" class="text-sm font-semibold text-lab-text mt-1 break-words"></div>
     </div>
 
     <!-- ==================== AUTH VIEW (LOGIN/REGISTER) ==================== -->
@@ -1078,6 +1078,7 @@
     // CAPACITOR LOCAL NOTIFICATIONS HELPERS
     // ==========================================
     const NOTIFICATION_CHANNEL_ID = 'ebbinghaus_reviews';
+    const DUE_PERSISTENT_NOTIF_ID = 999100;
 
     function getLocalNotificationsPlugin() {
       return window.Capacitor?.Plugins?.LocalNotifications;
@@ -1169,24 +1170,31 @@
       return false;
     }
 
-    async function sendAppNotification(title, body) {
+    async function sendAppNotification(title, body, options = {}) {
       const LN = getLocalNotificationsPlugin();
       if (LN) {
         try {
           const hasPerm = await requestAppNotificationPermission();
           if (hasPerm) {
             await ensureNotificationChannel();
+            const notif = {
+              id: options.id || (Math.floor(Math.random() * 899999) + 100000),
+              title: title,
+              body: body,
+              channelId: NOTIFICATION_CHANNEL_ID,
+              smallIcon: 'ic_launcher'
+            };
+            if (options.ongoing !== undefined) notif.ongoing = options.ongoing;
+            if (options.autoCancel !== undefined) notif.autoCancel = options.autoCancel;
+            if (options.extra) notif.extra = options.extra;
+
+            // delaySeconds が指定されている場合のみ schedule を設定（即時通知の時は schedule を省略することでAlarmManagerを介さず即時表示）
+            if (options.delaySeconds && options.delaySeconds > 0) {
+              notif.schedule = { at: new Date(Date.now() + options.delaySeconds * 1000), allowWhileIdle: true };
+            }
+
             await LN.schedule({
-              notifications: [
-                {
-                  id: Math.floor(Math.random() * 899999) + 100000,
-                  title: title,
-                  body: body,
-                  channelId: NOTIFICATION_CHANNEL_ID,
-                  smallIcon: 'ic_launcher',
-                  schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true }
-                }
-              ]
+              notifications: [notif]
             });
             return;
           }
@@ -1456,13 +1464,16 @@
             body: body,
             channelId: NOTIFICATION_CHANNEL_ID,
             schedule: { at: group.scheduleDate, allowWhileIdle: true },
-            smallIcon: 'ic_launcher'
+            smallIcon: 'ic_launcher',
+            ongoing: true,
+            autoCancel: false,
+            extra: { type: 'review_future_group' }
           });
 
-          // 予定時刻後も復習されない場合に備え、グループ単位で+30分後・+60分後・+90分後のスヌーズをスケジュール
+          // 予定時刻後も復習されない場合に備え、グループ単位で+30分ごとのスヌーズをスケジュール（タスク実施まで継続）
           // スヌーズ時刻が夜間（停止時間帯）にかかる場合は除外
           if (index < 5) { // 端末リソースを考慮し直近5グループに適用
-            for (let step = 1; step <= 3; step++) {
+            for (let step = 1; step <= 6; step++) {
               const snoozeTime = new Date(group.scheduleMs + step * 30 * 60 * 1000);
               if (isTimeInQuietHours(snoozeTime, quietConfig)) {
                 continue;
@@ -1474,39 +1485,67 @@
                 body: body,
                 channelId: NOTIFICATION_CHANNEL_ID,
                 schedule: { at: snoozeTime, allowWhileIdle: true },
-                smallIcon: 'ic_launcher'
+                smallIcon: 'ic_launcher',
+                ongoing: true,
+                autoCancel: false,
+                extra: { type: 'review_group_snooze' }
               });
             }
           }
         });
 
-        // 2. すでに期限が来ている（DUE）未完了タスクの処理（すべてまとめて1回で通知）
+        // 2. すでに期限が来ている（DUE）未完了タスクの処理（タスク実施するまで通知バーに常駐 & 継続リマインド）
         const dueItems = (dueItemsState || []).filter(i => i.is_completed === 0);
         if (dueItems.length > 0) {
           const dueNotif = formatGroupNotification(dueItems);
           const isQuietNow = isTimeInQuietHours(now, quietConfig);
 
-          // 現在が夜間停止時間帯でなく、かつ直近30分以内に通知していなければ即時通知を鳴らす
-          if (!isQuietNow && (nowMs - lastDueAlertTimestamp > 30 * 60 * 1000)) {
+          // 現在が夜間停止時間帯でなければ、通知バーに常駐する通知（ongoing: true, autoCancel: false）を即座に表示/更新
+          if (!isQuietNow) {
+            await sendAppNotification(dueNotif.title, dueNotif.body, {
+              id: DUE_PERSISTENT_NOTIF_ID,
+              ongoing: true,
+              autoCancel: false,
+              extra: { type: 'review_due_persistent' }
+            });
             lastDueAlertTimestamp = nowMs;
-            sendAppNotification(dueNotif.title, dueNotif.body);
           }
 
-          // アプリを閉じた状態でも定期的に通知されるよう、30分ごとにスヌーズ通知をスケジュール（夜間にかかるものは除外）
-          for (let step = 1; step <= 8; step++) {
-            const snoozeDelayMs = step * 30 * 60 * 1000;
-            const snoozeDate = new Date(nowMs + snoozeDelayMs);
+          // タスク実施するまで通知が途切れないよう、向こう36時間（最大36回）にわたり継続的にリマインドスケジュール
+          // step 1〜6: 30分間隔（〜3時間後）、step 7〜36: 60分間隔（〜33時間後）
+          let scheduleIndex = 0;
+          for (let step = 1; step <= 36; step++) {
+            const offsetMinutes = step <= 6 ? step * 30 : 180 + (step - 6) * 60;
+            const snoozeDate = new Date(nowMs + offsetMinutes * 60 * 1000);
             if (isTimeInQuietHours(snoozeDate, quietConfig)) {
               continue;
             }
+            scheduleIndex++;
             scheduledNotifications.push({
-              id: 999200 + step,
+              id: 999200 + scheduleIndex,
               title: dueNotif.title,
               body: dueNotif.body,
               channelId: NOTIFICATION_CHANNEL_ID,
               schedule: { at: snoozeDate, allowWhileIdle: true },
-              smallIcon: 'ic_launcher'
+              smallIcon: 'ic_launcher',
+              ongoing: true,
+              autoCancel: false,
+              extra: { type: 'review_due_snooze' }
             });
+          }
+        } else {
+          // 未完了タスクが0件（タスク実施完了時）: 通知バーに残っている常駐通知および配信済み通知を消去
+          try {
+            if (LN.removeAllDeliveredNotifications) {
+              await LN.removeAllDeliveredNotifications();
+            } else if (LN.removeDeliveredNotifications) {
+              await LN.removeDeliveredNotifications({
+                notifications: [{ id: DUE_PERSISTENT_NOTIF_ID }]
+              });
+            }
+            console.log('[LocalNotifications] タスク完了に伴い配信済み通知を消去しました。');
+          } catch (e) {
+            console.warn('[LocalNotifications] Delivered notifications clear error:', e);
           }
         }
 
@@ -1753,6 +1792,17 @@
       localStorage.removeItem('ebbinghaus_token');
       userToken = null;
       currentUser = null;
+
+      const LN = getLocalNotificationsPlugin();
+      if (LN) {
+        LN.getPending().then(pending => {
+          if (pending?.notifications?.length > 0) LN.cancel({ notifications: pending.notifications });
+        }).catch(() => {});
+        if (LN.removeAllDeliveredNotifications) {
+          LN.removeAllDeliveredNotifications().catch(() => {});
+        }
+      }
+
       showAuthScreen();
     }
 
@@ -1897,20 +1947,22 @@
           }
 
           const notifId = Math.floor(Math.random() * 899999) + 100000;
-          const scheduleTime = new Date(Date.now() + (delaySeconds > 0 ? delaySeconds * 1000 : 500));
+          const notif = {
+            id: notifId,
+            title: payload.title,
+            body: payload.body,
+            channelId: NOTIFICATION_CHANNEL_ID,
+            smallIcon: 'ic_launcher',
+            extra: { type: 'review_notification' }
+          };
+
+          // delaySeconds がある場合のみ schedule（AlarmManager）を使用し、即時はscheduleを省略して即時発火
+          if (delaySeconds > 0) {
+            notif.schedule = { at: new Date(Date.now() + delaySeconds * 1000), allowWhileIdle: true };
+          }
 
           await LN.schedule({
-            notifications: [
-              {
-                id: notifId,
-                title: payload.title,
-                body: payload.body,
-                channelId: NOTIFICATION_CHANNEL_ID,
-                smallIcon: 'ic_launcher',
-                schedule: { at: scheduleTime, allowWhileIdle: true },
-                extra: { type: 'review_notification' }
-              }
-            ]
+            notifications: [notif]
           });
 
           if (delaySeconds > 0) {
@@ -2741,15 +2793,6 @@
     }
 
   </script>
-
-  <!-- Custom Modal -->
-  <div id="custom-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm opacity-0 transition-opacity duration-300">
-    <div class="bg-lab-bg border border-lab-border rounded shadow-[0_0_20px_rgba(6,182,212,0.2)] p-6 max-w-sm w-full transform scale-95 transition-transform duration-300" id="custom-modal-content">
-      <h3 class="text-lg font-bold text-white mb-3 font-mono-lab" id="custom-modal-title"></h3>
-      <div class="text-sm text-lab-muted mb-6 leading-relaxed" id="custom-modal-message"></div>
-      <div class="flex justify-end gap-3" id="custom-modal-buttons"></div>
-    </div>
-  </div>
 </body>
 
 </html>
