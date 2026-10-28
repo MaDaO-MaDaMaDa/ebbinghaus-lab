@@ -279,12 +279,7 @@
   <!-- MAIN CONTENT AREA -->
   <main class="flex flex-col flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 pb-[calc(80px_+_env(safe-area-inset-bottom,0px))] md:pb-8 relative z-0 overflow-hidden min-h-0">
 
-    <!-- SYSTEM LOG FEEDBACK TOAST -->
-    <div id="sys-toast"
-      class="hidden fixed top-20 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-[250] lab-panel p-3 border-l-4 border-lab-cyan shadow-2xl transition-all duration-300 break-words pointer-events-auto">
-      <div class="text-xs font-bold text-lab-cyan tracking-widest font-mono-lab">[SYS_NOTIFICATION]</div>
-      <div id="toast-message" class="text-sm font-semibold text-lab-text mt-1 break-words"></div>
-    </div>
+
 
     <!-- ==================== AUTH VIEW (LOGIN/REGISTER) ==================== -->
     <section id="view-auth" class="min-h-[70vh] flex items-center justify-center">
@@ -1043,6 +1038,28 @@
       <span class="text-[10px] font-bold font-mono-lab">DEBUG</span>
     </button>
   </nav>
+
+  <!-- SYSTEM LOG FEEDBACK TOAST (FLOATING ABOVE BOTTOM NAV) -->
+  <div id="sys-toast"
+    class="fixed bottom-[calc(76px_+_env(safe-area-inset-bottom,0px))] md:bottom-8 left-4 right-4 max-w-md mx-auto md:left-auto md:right-8 md:mx-0 z-[300] bg-lab-panel/95 backdrop-blur-md p-3.5 rounded-lg border border-lab-cyan/40 border-l-4 border-l-lab-cyan shadow-[0_10px_25px_rgba(0,0,0,0.6),0_0_15px_rgba(6,182,212,0.2)] transition-all duration-300 ease-out pointer-events-none opacity-0 translate-y-3 flex items-start justify-between gap-3"
+    role="status" aria-live="polite">
+    <div class="flex items-start gap-2.5 min-w-0 flex-1">
+      <div class="text-lab-cyan mt-0.5 flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="text-[10px] font-bold text-lab-cyan tracking-widest font-mono-lab uppercase">[SYS_NOTIFICATION]</div>
+        <div id="toast-message" class="text-xs md:text-sm font-semibold text-white mt-0.5 break-words leading-relaxed"></div>
+      </div>
+    </div>
+    <button type="button" onclick="hideToast()" class="text-lab-muted hover:text-white transition flex-shrink-0 p-1 -mr-1 -mt-1" aria-label="閉じる">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>
+    </button>
+  </div>
 
   <!-- CUSTOM MODAL -->
   <div id="custom-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center transition-opacity duration-300">
@@ -2083,13 +2100,38 @@
       }
     }
 
+    let toastTimeoutId = null;
+
     function showToast(msg) {
       const toast = document.getElementById('sys-toast');
-      document.getElementById('toast-message').innerText = msg;
-      toast.classList.remove('hidden');
-      setTimeout(() => {
-        toast.classList.add('hidden');
+      const msgEl = document.getElementById('toast-message');
+      if (!toast || !msgEl) return;
+
+      msgEl.innerText = msg;
+
+      if (toastTimeoutId) {
+        clearTimeout(toastTimeoutId);
+        toastTimeoutId = null;
+      }
+
+      // 表示アニメーション（スライドアップ＆フェードイン）
+      toast.classList.remove('pointer-events-none', 'opacity-0', 'translate-y-3');
+      toast.classList.add('pointer-events-auto', 'opacity-100', 'translate-y-0');
+
+      toastTimeoutId = setTimeout(() => {
+        hideToast();
       }, 3500);
+    }
+
+    function hideToast() {
+      const toast = document.getElementById('sys-toast');
+      if (!toast) return;
+      if (toastTimeoutId) {
+        clearTimeout(toastTimeoutId);
+        toastTimeoutId = null;
+      }
+      toast.classList.remove('pointer-events-auto', 'opacity-100', 'translate-y-0');
+      toast.classList.add('pointer-events-none', 'opacity-0', 'translate-y-3');
     }
 
     function getHeaders() {
