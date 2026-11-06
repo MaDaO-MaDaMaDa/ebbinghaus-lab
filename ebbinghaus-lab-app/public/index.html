@@ -266,6 +266,10 @@
           class="px-3 py-1.5 rounded transition text-lab-muted hover:text-white">
           [04_ACCOUNT]
         </button>
+        <button onclick="switchView('debug')" id="tab-debug"
+          class="hidden px-3 py-1.5 rounded transition text-lab-yellow hover:text-white">
+          [05_DEBUG]
+        </button>
       </nav>
 
       <div class="text-xs text-lab-muted hidden lg:flex items-center gap-4 font-mono-lab">
@@ -1886,20 +1890,13 @@
       }
     }
 
-    function isLocalDevEnvironment() {
-      const isNative = !!(window.Capacitor?.isNativePlatform?.() || window.location.protocol === 'file:');
-      if (isNative) return false;
-      return window.location.hostname === '127.0.0.1' ||
-        (window.location.hostname === 'localhost' && window.location.port !== '');
-    }
-
     let headerClickCount = 0;
     let headerClickTimer = null;
     function handleHeaderClick() {
-      if (!isLocalDevEnvironment()) return;
       headerClickCount++;
       if (headerClickTimer) clearTimeout(headerClickTimer);
-      headerClickTimer = setTimeout(() => { headerClickCount = 0; }, 2000);
+      headerClickTimer = setTimeout(() => { headerClickCount = 0; }, 3000);
+
       if (headerClickCount >= 5) {
         headerClickCount = 0;
         const mobTab = document.getElementById('mob-tab-debug');
@@ -1907,7 +1904,11 @@
           mobTab.classList.remove('hidden');
           mobTab.classList.add('flex');
         }
-        showToast('Debug mode unlocked (local dev)');
+        const desktopTab = document.getElementById('tab-debug');
+        if (desktopTab) {
+          desktopTab.classList.remove('hidden');
+        }
+        showToast('デバッグモードを解放しました');
         switchView('debug');
       }
     }
@@ -1917,6 +1918,10 @@
       if (mobTab) {
         mobTab.classList.add('hidden');
         mobTab.classList.remove('flex');
+      }
+      const desktopTab = document.getElementById('tab-debug');
+      if (desktopTab) {
+        desktopTab.classList.add('hidden');
       }
       switchView('dashboard');
     }
