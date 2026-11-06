@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          npm install
+          npm ci
 
       - name: Build Web Assets
         run: |
@@ -44,7 +47,7 @@ jobs:
 
       - name: Generate Custom App Icons and Splash Screen
         run: |
-          pip install pillow
+          python3 -m pip install "pillow>=10.4.0,<12.0.0"
           python3 scripts/generate-icons.py
 
       - name: Configure Android SDK and Permissions

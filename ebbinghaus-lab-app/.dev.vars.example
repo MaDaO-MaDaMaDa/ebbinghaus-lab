@@ -1,0 +1,4 @@
+# Copy this file to .dev.vars for local development (never commit .dev.vars)
+# Generate a strong secret with: openssl rand -base64 32
+JWT_SECRET="replace-with-at-least-32-bytes-of-random-secret"
+

@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "secret:pub": "wrangler secret put VAPID_PUBLIC_KEY",
-    "secret:priv": "wrangler secret put VAPID_PRIVATE_JWK"
+    "secret:jwt": "wrangler secret put JWT_SECRET"
   },
   "dependencies": {
     "hono": "^4.0.0"

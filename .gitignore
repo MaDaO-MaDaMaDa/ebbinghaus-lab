@@ -2,7 +2,15 @@ node_modules
 .wrangler
 dist
 .env
+.env.*
+**/.env
+**/.env.*
+.dev.vars
+**/.dev.vars
+npm-debug.log*
+**/npm-debug.log*
 .DS_Store
+**/.DS_Store
 www/
 android/.gradle/
 android/build/
